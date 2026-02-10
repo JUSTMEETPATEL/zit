@@ -7,6 +7,7 @@ class Zit < Formula
   head "https://github.com/JUSTMEETPATEL/zit.git", branch: "main"
 
   depends_on "rust" => :build
+  depends_on "git"
 
   def install
     system "cargo", "install", *std_cargo_args
