@@ -20,21 +20,13 @@
 
 ## Installation
 
-### macOS (via Homebrew)
-
-You can install `zit` directly from the repository using Homebrew:
-
-```bash
-brew install --HEAD https://raw.githubusercontent.com/JUSTMEETPATEL/zit/main/Formula/zit.rb
-```
-
-*Note: This installs the latest version from the main branch.*
-
 ### From Source (Rust/Cargo)
 
 ```bash
 cargo install --path .
 ```
+
+*Note: Homebrew support will be available soon once the formula is added to the official core or a custom tap.*
 
 ## Usage
 
