@@ -1,6 +1,6 @@
 [package]
 name = "zit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "An AI-powered, terminal-based Git and GitHub CLI tool"
 license = "MIT"

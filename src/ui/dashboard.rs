@@ -148,8 +148,19 @@ pub fn render(f: &mut Frame, area: Rect, state: &DashboardState, status_msg: &Op
         .recent_commits
         .iter()
         .map(|c| {
+            let graph_span = if c.graph.is_empty() {
+                Span::raw("  ")
+            } else {
+                Span::styled(format!("{} ", c.graph), Style::default().fg(Color::Magenta))
+            };
+
+            if c.hash.is_empty() {
+                 return ListItem::new(Line::from(vec![graph_span]));
+            }
+
             ListItem::new(Line::from(vec![
-                Span::styled(format!("  {} ", c.short_hash), Style::default().fg(Color::Yellow)),
+                graph_span,
+                Span::styled(format!("{} ", c.short_hash), Style::default().fg(Color::Yellow)),
                 Span::styled(&c.message, Style::default().fg(Color::White)),
                 Span::styled(format!(" ({})", c.date), Style::default().fg(Color::DarkGray)),
             ]))
