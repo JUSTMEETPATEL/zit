@@ -67,6 +67,16 @@ zit
 | `?` | Help                                                    |
 | `q` | Quit                                                    |
 
+## Troubleshooting
+
+### Windows: `linker link.exe not found`
+If you see this error during installation, it means you are missing the C++ Build Tools required by Rust.
+
+1.  Download **[Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)**.
+2.  Run the installer.
+3.  Select the **"Desktop development with C++"** workload.
+4.  Install and restart your terminal.
+
 ## License
 
 MIT
