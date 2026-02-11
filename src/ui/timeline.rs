@@ -72,6 +72,12 @@ impl TimelineState {
 
     fn load_detail(&mut self) {
         if let Some(commit) = self.commits.get(self.selected) {
+            if commit.hash.is_empty() {
+                self.detail_commit = None;
+                self.detail_diff.clear();
+                return;
+            }
+
             self.detail_commit = Some(commit.clone());
             self.detail_diff.clear();
             self.detail_scroll = 0;
@@ -103,6 +109,11 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut TimelineState) {
             } else {
                 Span::styled(&c.graph, Style::default().fg(Color::Magenta))
             };
+
+            if c.hash.is_empty() {
+                // Graph-only line
+                return ListItem::new(Line::from(vec![graph_span]));
+            }
 
             let hash_span = Span::styled(
                 format!("{} ", c.short_hash),
@@ -253,8 +264,12 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
             }
         }
         KeyCode::Enter => {
-            app.timeline_state.load_detail();
-            app.timeline_state.show_detail = true;
+            if let Some(commit) = app.timeline_state.commits.get(app.timeline_state.selected) {
+                 if !commit.hash.is_empty() {
+                    app.timeline_state.load_detail();
+                    app.timeline_state.show_detail = true;
+                 }
+            }
         }
         KeyCode::Char('/') => {
             let query = app.timeline_state.search_query.clone();
@@ -269,8 +284,11 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
             // Copy hash to clipboard
             let selected = app.timeline_state.selected;
             if let Some(commit) = app.timeline_state.commits.get(selected) {
-                let hash = commit.short_hash.clone();
-                app.set_status(format!("Copied: {}", hash));
+                if !commit.hash.is_empty() {
+                    let hash = commit.short_hash.clone();
+                    app.set_status(format!("Copied: {}", hash));
+                    // In a real app, integrate with a clipboard crate here
+                }
             }
         }
         KeyCode::PageDown => {
