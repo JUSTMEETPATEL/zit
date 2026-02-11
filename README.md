@@ -12,7 +12,7 @@
 - **Guided Commits**: Commit editor with validation and history lookup (`c` key).
 - **Visual Branching**: Manage branches visually (`b` key).
 - **Time Travel**: Safe reset/restore with confirmation (`t` key).
-- **GitHub Integration**: 
+- **GitHub Integration**:
   - Authenticate securely via OAuth Device Flow.
   - Create repositories.
   - **Push/Pull/Sync** in background.
@@ -23,7 +23,7 @@
 You can install `zit` easily using our official Homebrew tap:
 
 ```bash
-brew tap JUSTMEETPATEL/zit
+Sbrew tap JUSTMEETPATEL/zit
 brew install zit
 ```
 
@@ -38,9 +38,11 @@ cargo install --git https://github.com/JUSTMEETPATEL/zit
 ```
 
 *Prerequisites:*
+
 - **Rust/Cargo**: Install via [rustup.rs](https://rustup.rs).
 - **Git**: Ensure `git` is installed and in your PATH.
 - **Terminal**: Use a modern terminal with TrueColor support (e.g., Windows Terminal, Alacritty, GNOME Terminal).
+- **Windows Only**: You must install [Build Tools for Visual Studio](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the **"Desktop development with C++"** workload to compile Rust.
 
 ## Usage
 
@@ -53,17 +55,17 @@ zit
 
 ### Keybindings
 
-| Key | Action |
-| --- | --- |
-| `s` | **Stage** files (interactive staging area) |
-| `c` | **Commit** changes |
-| `b` | Manage **Branches** |
-| `l` | View Commit **Log** |
-| `t` | **Time Travel** (Reset/Restore) |
-| `r` | View **Reflog** |
+| Key   | Action                                                  |
+| ----- | ------------------------------------------------------- |
+| `s` | **Stage** files (interactive staging area)        |
+| `c` | **Commit** changes                                |
+| `b` | Manage**Branches**                                |
+| `l` | View Commit**Log**                                |
+| `t` | **Time Travel** (Reset/Restore)                   |
+| `r` | View**Reflog**                                    |
 | `g` | **GitHub** Integration (Sync, PRs, Collaborators) |
-| `?` | Help |
-| `q` | Quit |
+| `?` | Help                                                    |
+| `q` | Quit                                                    |
 
 ## License
 
