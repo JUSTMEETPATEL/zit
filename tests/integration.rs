@@ -284,11 +284,15 @@ fn test_stash_pop_restores_changes() {
     std::fs::write(dir.path().join("README.md"), "stash me\n").unwrap();
     git(dir.path(), &["stash", "push", "-m", "pop test"]);
     // README should be back to original
-    let contents = std::fs::read_to_string(dir.path().join("README.md")).unwrap().replace("\r", "");
+    let contents = std::fs::read_to_string(dir.path().join("README.md"))
+        .unwrap()
+        .replace("\r", "");
     assert_eq!(contents, "# Test\n");
     // Pop it
     git(dir.path(), &["stash", "pop"]);
-    let contents = std::fs::read_to_string(dir.path().join("README.md")).unwrap().replace("\r", "");
+    let contents = std::fs::read_to_string(dir.path().join("README.md"))
+        .unwrap()
+        .replace("\r", "");
     assert_eq!(contents, "stash me\n");
 }
 
@@ -302,7 +306,9 @@ fn test_stash_apply_keeps_entry() {
     let list = git(dir.path(), &["stash", "list"]);
     assert_eq!(list.lines().count(), 1);
     // Changes should be restored
-    let contents = std::fs::read_to_string(dir.path().join("README.md")).unwrap().replace("\r", "");
+    let contents = std::fs::read_to_string(dir.path().join("README.md"))
+        .unwrap()
+        .replace("\r", "");
     assert_eq!(contents, "apply me\n");
 }
 
