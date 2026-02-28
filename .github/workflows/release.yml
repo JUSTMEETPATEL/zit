@@ -117,3 +117,50 @@ jobs:
           prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-formula:
+    name: Update Homebrew Formula
+    needs: create-release
+    runs-on: ubuntu-latest
+    # Only run on real version tags (not pre-releases)
+    if: ${{ !contains(github.ref, '-rc') && !contains(github.ref, '-beta') && !contains(github.ref, '-alpha') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute new version and SHA256
+        id: formula
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz"
+
+          # Download the source tarball and compute its SHA256
+          curl -sL "$URL" -o source.tar.gz
+          SHA=$(sha256sum source.tar.gz | awk '{print $1}')
+
+          echo "tag=$TAG"   >> $GITHUB_OUTPUT
+          echo "url=$URL"   >> $GITHUB_OUTPUT
+          echo "sha=$SHA"   >> $GITHUB_OUTPUT
+
+      - name: Patch Formula/zit.rb
+        run: |
+          TAG="${{ steps.formula.outputs.tag }}"
+          URL="${{ steps.formula.outputs.url }}"
+          SHA="${{ steps.formula.outputs.sha }}"
+
+          sed -i "s|url \".*\"|url \"$URL\"|"     Formula/zit.rb
+          sed -i "s|sha256 \".*\"|sha256 \"$SHA\"|" Formula/zit.rb
+
+          echo "Updated Formula/zit.rb to $TAG"
+          grep -E 'url|sha256' Formula/zit.rb
+
+      - name: Commit and push updated formula
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Formula/zit.rb
+          git commit -m "chore: bump Homebrew formula to ${{ steps.formula.outputs.tag }}" || echo "No changes to commit"
+          git push origin main
