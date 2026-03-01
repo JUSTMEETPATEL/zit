@@ -489,6 +489,31 @@ impl AiClient {
         self.call(&request)
     }
 
+    /// Get AI recommendation for resetting to a specific commit.
+    pub fn suggest_reset(
+        &self,
+        current_hash: &str,
+        target_hash: &str,
+        target_msg: &str,
+        commits_back: usize,
+    ) -> Result<String> {
+        let ctx = build_repo_context(false)?;
+        let query = format!(
+            "I want to reset from current HEAD ({}) to commit {} (\"{}\"), \
+             which is {} commit(s) back. \
+             Explain what will happen with: --soft, --mixed, and --hard reset. \
+             Which type do you recommend and why? Be concise.",
+            current_hash, target_hash, target_msg, commits_back
+        );
+        let request = MentorRequest {
+            request_type: "recommend".to_string(),
+            context: Some(ctx),
+            query: Some(query),
+            error: None,
+        };
+        self.call(&request)
+    }
+
     /// Check if the client is configured and reachable (quick check, no API call).
     #[allow(dead_code)] // Public utility — used in tests and available for consumers
     pub fn is_configured(&self) -> bool {

@@ -120,6 +120,7 @@ pub enum AiAction {
     Learn,
     MergeResolve(String), // file path being resolved
     MergeStrategy,
+    ResetSuggest,
 }
 
 pub struct App {
@@ -960,6 +961,43 @@ impl App {
         });
     }
 
+    /// Start an async AI reset suggestion — non-blocking.
+    pub fn start_ai_reset_suggest(
+        &mut self,
+        current_hash: String,
+        target_hash: String,
+        target_msg: String,
+        commits_back: usize,
+    ) {
+        if self.ai_loading {
+            self.set_status("⏳ AI is already working...");
+            return;
+        }
+        let client = match self.ai_client {
+            Some(ref c) => c.clone(),
+            None => {
+                self.set_status("AI not configured — press 'a' to open AI Mentor and set up");
+                return;
+            }
+        };
+
+        self.ai_loading = true;
+        self.ai_action = Some(AiAction::ResetSuggest);
+        self.time_travel_state.ai_loading = true;
+        self.time_travel_state.ai_suggestion = None;
+        self.set_status("⏳ AI analyzing reset options...");
+
+        let (tx, rx) = mpsc::channel();
+        self.ai_receiver = Some(rx);
+
+        std::thread::spawn(move || {
+            let result = client
+                .suggest_reset(&current_hash, &target_hash, &target_msg, commits_back)
+                .map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
+    }
+
     /// Execute a follow-up action from the suggestion list.
     pub fn execute_follow_up(&mut self, action: FollowUpAction) {
         match action {
@@ -1170,6 +1208,15 @@ impl App {
                             // Store in history
                             self.ai_mentor_state
                                 .add_history("Merge Strategy".to_string(), response);
+                        }
+                        Some(AiAction::ResetSuggest) => {
+                            self.time_travel_state.ai_suggestion = Some(response.clone());
+                            self.time_travel_state.ai_loading = false;
+                            self.time_travel_state.ai_scroll = 0;
+                            self.set_status("✓ AI reset insight ready — press Esc to dismiss");
+                            // Store in history
+                            self.ai_mentor_state
+                                .add_history("Reset Insight".to_string(), response);
                         }
                         None => {
                             self.set_status(format!("AI: {}", response));

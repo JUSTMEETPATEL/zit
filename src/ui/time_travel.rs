@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 
@@ -14,6 +14,9 @@ pub struct TimeTravelState {
     pub commits: Vec<git::CommitEntry>,
     pub selected: usize,
     pub list_state: ListState,
+    pub ai_suggestion: Option<String>,
+    pub ai_loading: bool,
+    pub ai_scroll: u16,
 }
 
 impl TimeTravelState {
@@ -38,12 +41,23 @@ impl TimeTravelState {
 }
 
 pub fn render(f: &mut Frame, area: Rect, state: &mut TimeTravelState) {
+    let has_ai = state.ai_suggestion.is_some() || state.ai_loading;
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(10),   // Commit list
-            Constraint::Length(5), // Action hints
-        ])
+        .constraints(if has_ai {
+            vec![
+                Constraint::Percentage(40), // Commit list
+                Constraint::Percentage(50), // AI suggestion panel
+                Constraint::Length(5),      // Action hints
+            ]
+        } else {
+            vec![
+                Constraint::Min(10),   // Commit list
+                Constraint::Length(0), // No AI panel
+                Constraint::Length(5), // Action hints
+            ]
+        })
         .split(area);
 
     // Commit list
@@ -86,6 +100,60 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut TimeTravelState) {
 
     f.render_stateful_widget(list, chunks[0], &mut state.list_state);
 
+    // AI suggestion panel
+    if has_ai {
+        let ai_content = if state.ai_loading {
+            vec![Line::from(Span::styled(
+                "  ⏳ AI is analyzing reset options...",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::ITALIC),
+            ))]
+        } else if let Some(ref suggestion) = state.ai_suggestion {
+            suggestion
+                .lines()
+                .map(|line| {
+                    let color = if line.starts_with("##") || line.starts_with("**") {
+                        Color::Cyan
+                    } else if line.contains("--soft") {
+                        Color::Green
+                    } else if line.contains("--mixed") {
+                        Color::Yellow
+                    } else if line.contains("--hard") {
+                        Color::Red
+                    } else if line.contains("recommend") || line.contains("Recommend") {
+                        Color::Magenta
+                    } else {
+                        Color::White
+                    };
+                    Line::from(Span::styled(
+                        format!("  {}", line),
+                        Style::default().fg(color),
+                    ))
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
+        let ai_panel = Paragraph::new(ai_content)
+            .block(
+                Block::default()
+                    .title(Span::styled(
+                        " 🤖 AI Reset Insight — [Esc] dismiss ",
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan)),
+            )
+            .scroll((state.ai_scroll, 0))
+            .wrap(Wrap { trim: false });
+
+        f.render_widget(ai_panel, chunks[1]);
+    }
+
     // Action hints
     let hints = Paragraph::new(vec![
         Line::from(vec![
@@ -101,6 +169,8 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut TimeTravelState) {
             Span::raw(" Create Branch "),
             Span::styled("[f]", Style::default().fg(Color::Cyan)),
             Span::raw(" Restore File "),
+            Span::styled("[i]", Style::default().fg(Color::Magenta)),
+            Span::raw(" AI Insight "),
             Span::styled("[q]", Style::default().fg(Color::DarkGray)),
             Span::raw(" Back"),
         ]),
@@ -115,23 +185,70 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut TimeTravelState) {
             .border_style(Style::default().fg(Color::DarkGray)),
     );
 
-    f.render_widget(hints, chunks[1]);
+    f.render_widget(hints, chunks[2]);
 }
 
 pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()> {
     let state = &mut app.time_travel_state;
 
+    // If AI panel is visible, handle scroll/dismiss first
+    if state.ai_suggestion.is_some() {
+        match key.code {
+            KeyCode::Esc => {
+                state.ai_suggestion = None;
+                state.ai_scroll = 0;
+                return Ok(());
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                state.ai_scroll = state.ai_scroll.saturating_add(1);
+                return Ok(());
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                state.ai_scroll = state.ai_scroll.saturating_sub(1);
+                return Ok(());
+            }
+            KeyCode::PageDown => {
+                state.ai_scroll = state.ai_scroll.saturating_add(10);
+                return Ok(());
+            }
+            KeyCode::PageUp => {
+                state.ai_scroll = state.ai_scroll.saturating_sub(10);
+                return Ok(());
+            }
+            _ => {
+                // Let other keys pass through (s/m/h for reset, etc.)
+            }
+        }
+    }
+
     match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up | KeyCode::Char('k') if state.ai_suggestion.is_none() => {
             if state.selected > 0 {
                 state.selected -= 1;
                 state.list_state.select(Some(state.selected));
             }
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down | KeyCode::Char('j') if state.ai_suggestion.is_none() => {
             if state.selected + 1 < state.commits.len() {
                 state.selected += 1;
                 state.list_state.select(Some(state.selected));
+            }
+        }
+        KeyCode::Char('i') => {
+            // AI reset insight
+            if let Some(commit) = state.commits.get(state.selected) {
+                let target_hash = commit.short_hash.clone();
+                let target_msg = commit.message.clone();
+                let commits_back = state.selected;
+
+                // Get current HEAD hash
+                let current_hash = state
+                    .commits
+                    .first()
+                    .map(|c| c.short_hash.clone())
+                    .unwrap_or_else(|| "HEAD".to_string());
+
+                app.start_ai_reset_suggest(current_hash, target_hash, target_msg, commits_back);
             }
         }
         KeyCode::Char('s') => {
