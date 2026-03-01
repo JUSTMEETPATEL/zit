@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use crate::ai::client::AiClient;
 use crate::config::Config;
@@ -102,6 +102,7 @@ pub enum InputAction {
     SearchFiles,
     CommitMessage,
     AddCollaborator,
+    AiSetupProvider,
     AiSetupEndpoint,
     AiSetupApiKey,
     StashPush,
@@ -129,12 +130,13 @@ pub struct App {
     pub popup: Popup,
     pub config: Config,
     pub status_message: Option<String>,
-    pub ai_client: Option<AiClient>,
+    pub ai_client: Option<Arc<AiClient>>,
     pub ai_loading: bool,
     ai_receiver: Option<mpsc::Receiver<Result<String, String>>>,
     ai_action: Option<AiAction>,
-    /// Temporary storage for AI setup wizard (endpoint from step 1).
+    /// Temporary storage for AI setup wizard.
     ai_setup_endpoint: Option<String>,
+    ai_setup_provider: Option<String>,
 
     // View states
     pub dashboard_state: dashboard::DashboardState,
@@ -168,11 +170,12 @@ impl App {
             popup: Popup::None,
             config,
             status_message,
-            ai_client,
+            ai_client: ai_client.map(Arc::new),
             ai_loading: false,
             ai_receiver: None,
             ai_action: None,
             ai_setup_endpoint: None,
+            ai_setup_provider: None,
             dashboard_state: dashboard::DashboardState::default(),
             staging_state: staging::StagingState::default(),
             commit_state: commit::CommitState::default(),
@@ -572,7 +575,10 @@ impl App {
         if value.trim().is_empty()
             && !matches!(
                 action,
-                InputAction::AiSetupEndpoint | InputAction::AiSetupApiKey | InputAction::StashPush
+                InputAction::AiSetupProvider
+                | InputAction::AiSetupEndpoint
+                | InputAction::AiSetupApiKey
+                | InputAction::StashPush
             )
         {
             return Ok(());
@@ -630,42 +636,116 @@ impl App {
                     }
                 }
             }
+            InputAction::AiSetupProvider => {
+                // Step 1 — pick provider by number
+                let choice = value.trim();
+                let provider = match choice {
+                    "1" => "bedrock",
+                    "2" => "openai",
+                    "3" => "anthropic",
+                    "4" => "openrouter",
+                    "5" => "ollama",
+                    _ => {
+                        self.set_status("Invalid choice — enter 1-5");
+                        self.start_ai_setup(); // re-show
+                        return Ok(());
+                    }
+                };
+                self.ai_setup_provider = Some(provider.to_string());
+                self.config.ai.provider = provider.to_string();
+
+                match provider {
+                    "bedrock" => {
+                        // Bedrock needs endpoint
+                        self.popup = Popup::Input {
+                            title: "🤖 AI Setup — Bedrock (2/3)".to_string(),
+                            prompt: "Lambda Endpoint URL: ".to_string(),
+                            value: self.config.ai.effective_endpoint().unwrap_or_default(),
+                            on_submit: InputAction::AiSetupEndpoint,
+                        };
+                    }
+                    "ollama" => {
+                        // Ollama: optional endpoint, no key needed
+                        self.popup = Popup::Input {
+                            title: "🤖 AI Setup — Ollama (2/2)".to_string(),
+                            prompt: "Ollama URL (Enter for default): ".to_string(),
+                            value: "http://localhost:11434".to_string(),
+                            on_submit: InputAction::AiSetupEndpoint,
+                        };
+                    }
+                    _ => {
+                        // OpenAI, Anthropic, OpenRouter: go straight to API key
+                        self.ai_setup_endpoint = None;
+                        self.popup = Popup::Input {
+                            title: format!("🤖 AI Setup — {} (2/2)", provider),
+                            prompt: "API Key: ".to_string(),
+                            value: self.config.ai.resolved_api_key().unwrap_or_default(),
+                            on_submit: InputAction::AiSetupApiKey,
+                        };
+                    }
+                }
+            }
             InputAction::AiSetupEndpoint => {
-                // Step 1 complete — store endpoint, ask for API key
                 let endpoint = value.trim().to_string();
-                if endpoint.is_empty() {
-                    self.set_status("AI setup cancelled — endpoint is required");
+                let provider = self.ai_setup_provider.clone().unwrap_or("bedrock".to_string());
+
+                if provider == "bedrock" && endpoint.is_empty() {
+                    self.set_status("AI setup cancelled — Bedrock requires an endpoint");
                     return Ok(());
                 }
-                self.ai_setup_endpoint = Some(endpoint);
-                self.popup = Popup::Input {
-                    title: "🤖 AI Setup (2/2)".to_string(),
-                    prompt: "API Key: ".to_string(),
-                    value: self.config.ai.resolved_api_key().unwrap_or_default(),
-                    on_submit: InputAction::AiSetupApiKey,
-                };
+
+                if !endpoint.is_empty() {
+                    self.ai_setup_endpoint = Some(endpoint.clone());
+                    self.config.ai.endpoint = Some(endpoint);
+                }
+
+                if provider == "ollama" {
+                    // Ollama doesn't need API key — finish setup
+                    self.config.ai.enabled = true;
+                    match self.config.save() {
+                        Ok(()) => {}
+                        Err(e) => self.set_status(format!("⚠ Config save failed: {}", e)),
+                    }
+                    self.ai_client = AiClient::from_config(&self.config.ai).map(Arc::new);
+                    if self.ai_client.is_some() {
+                        self.set_status("✓ Ollama configured! Testing connection...");
+                        self.start_ai_query("health_check".to_string(), None);
+                    } else {
+                        self.set_status("Ollama setup failed — is Ollama running? (ollama serve)");
+                    }
+                } else {
+                    // Bedrock: now ask for API key
+                    self.popup = Popup::Input {
+                        title: "🤖 AI Setup — Bedrock (3/3)".to_string(),
+                        prompt: "API Key: ".to_string(),
+                        value: self.config.ai.resolved_api_key().unwrap_or_default(),
+                        on_submit: InputAction::AiSetupApiKey,
+                    };
+                }
             }
             InputAction::AiSetupApiKey => {
-                // Step 2 complete — test + save
                 let api_key = value.trim().to_string();
-                let endpoint = self.ai_setup_endpoint.take().unwrap_or_default();
-                if api_key.is_empty() || endpoint.is_empty() {
-                    self.set_status("AI setup cancelled — endpoint and API key are required");
+                let endpoint = self.ai_setup_endpoint.take();
+
+                if api_key.is_empty() {
+                    self.set_status("AI setup cancelled — API key is required");
                     return Ok(());
                 }
-                // Update config in memory
+
                 self.config.ai.enabled = true;
-                self.config.ai.endpoint = Some(endpoint);
+                if let Some(ep) = endpoint {
+                    self.config.ai.endpoint = Some(ep);
+                }
                 self.config.ai.api_key = Some(api_key);
-                // Save to disk
+
                 match self.config.save() {
                     Ok(()) => {}
                     Err(e) => self.set_status(format!("⚠ Config in memory but save failed: {}", e)),
                 }
-                // Recreate AI client
-                self.ai_client = AiClient::from_config(&self.config.ai);
+                self.ai_client = AiClient::from_config(&self.config.ai).map(Arc::new);
                 if self.ai_client.is_some() {
-                    self.set_status("✓ AI configured! Testing connection...");
+                    let pname = self.ai_setup_provider.take().unwrap_or("AI".to_string());
+                    self.set_status(format!("✓ {} configured! Testing connection...", pname));
                     self.start_ai_query("health_check".to_string(), None);
                 } else {
                     self.set_status("AI setup failed — could not create client");
@@ -694,13 +774,13 @@ impl App {
         Ok(())
     }
 
-    /// Launch the interactive AI setup wizard (2-step: endpoint → API key).
+    /// Launch the interactive AI setup wizard.
     pub fn start_ai_setup(&mut self) {
         self.popup = Popup::Input {
-            title: "🤖 AI Setup (1/2)".to_string(),
-            prompt: "API Endpoint URL: ".to_string(),
-            value: self.config.ai.resolved_endpoint().unwrap_or_default(),
-            on_submit: InputAction::AiSetupEndpoint,
+            title: "🤖 AI Provider Setup (1/3)".to_string(),
+            prompt: "Choose provider (1-5):\n  1) Bedrock ⭐ (recommended)\n  2) OpenAI\n  3) Anthropic\n  4) OpenRouter\n  5) Ollama (local)\n> ".to_string(),
+            value: "1".to_string(),
+            on_submit: InputAction::AiSetupProvider,
         };
     }
 
@@ -722,7 +802,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured. Set [ai] in ~/.config/zit/config.toml or export ZIT_AI_API_KEY + ZIT_AI_ENDPOINT");
                 return;
@@ -749,7 +829,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured. Set [ai] in ~/.config/zit/config.toml or export ZIT_AI_API_KEY + ZIT_AI_ENDPOINT");
                 return;
@@ -793,7 +873,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => return,
         };
 
@@ -817,7 +897,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured — press 'a' to open AI Mentor and set up");
                 return;
@@ -851,7 +931,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured");
                 return;
@@ -878,7 +958,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured");
                 return;
@@ -905,7 +985,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured — press 'a' to open AI Mentor and set up");
                 return;
@@ -939,7 +1019,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.set_status("AI not configured — press 'a' to open AI Mentor and set up");
                 return;
@@ -977,7 +1057,7 @@ impl App {
             return;
         }
         let client = match self.ai_client {
-            Some(ref c) => c.clone(),
+            Some(ref c) => Arc::clone(c),
             None => {
                 self.time_travel_state.ai_suggestion = Some(
                     "⚠ AI is not configured.\n\n\

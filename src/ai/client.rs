@@ -1,4 +1,7 @@
-//! AI Mentor client — calls the AWS Lambda backend for AI-powered suggestions.
+//! AI Mentor client — supports multiple AI providers.
+//!
+//! Providers: Amazon Bedrock (Lambda), OpenAI, Anthropic, OpenRouter, Ollama.
+//! See `ai::provider` for the trait and implementations.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -37,7 +40,7 @@ pub struct MentorRequest {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct RepoContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
@@ -61,7 +64,7 @@ pub struct RepoContext {
     pub detached_head: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DiffStats {
     pub files_changed: usize,
     pub insertions: usize,
@@ -112,31 +115,33 @@ fn cache_key(request: &MentorRequest) -> String {
     format!("{:x}", hasher.finish())
 }
 
+use crate::ai::prompts;
+use crate::ai::provider::{self, AiProvider};
+
 // ─── Client ────────────────────────────────────────────────────
 
-/// AI Mentor client that talks to the AWS Lambda backend.
-#[derive(Clone)]
+/// AI Mentor client that dispatches requests through a provider.
 pub struct AiClient {
+    provider: Box<dyn AiProvider>,
+    /// Keep raw endpoint/api_key for Bedrock's call_raw() path.
     endpoint: String,
     api_key: String,
+    provider_kind: String,
     client: reqwest::blocking::Client,
     cache: ResponseCache,
 }
 
 impl AiClient {
     /// Create a new AI client from config. Returns None if AI is not configured.
-    /// Supports env vars ZIT_AI_ENDPOINT and ZIT_AI_API_KEY as fallbacks.
     pub fn from_config(config: &AiConfig) -> Option<Self> {
         if !config.enabled {
             return None;
         }
-        let endpoint = config.resolved_endpoint()?;
-        let api_key = config.resolved_api_key()?;
 
-        // Validate endpoint URL format
-        if !endpoint.starts_with("https://") && !endpoint.starts_with("http://") {
-            return None;
-        }
+        let prov = provider::create_provider(config)?;
+        let provider_kind = config.effective_provider().to_string();
+        let endpoint = config.effective_endpoint().unwrap_or_default();
+        let api_key = config.resolved_api_key().unwrap_or_default();
 
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(
@@ -147,11 +152,23 @@ impl AiClient {
             .ok()?;
 
         Some(Self {
+            provider: prov,
             endpoint,
             api_key,
+            provider_kind,
             client,
             cache: Arc::new(Mutex::new(HashMap::new())),
         })
+    }
+
+    /// The active provider's display name (e.g. "Amazon Bedrock", "Ollama").
+    pub fn provider_name(&self) -> &str {
+        self.provider.name()
+    }
+
+    /// The model being used.
+    pub fn model_name(&self) -> &str {
+        self.provider.model_name()
     }
 
     /// Generate a unique request ID for tracing.
@@ -200,7 +217,9 @@ impl AiClient {
         }
     }
 
-    /// Send a request to the AI mentor API with caching, retry, and error classification.
+    /// Send a request to the AI mentor with caching, retry, and error classification.
+    /// For Bedrock, sends the full MentorRequest JSON to Lambda.
+    /// For other providers, builds prompts client-side and calls provider.chat().
     fn call(&self, request: &MentorRequest) -> Result<String> {
         // Check cache first
         let ckey = cache_key(request);
@@ -211,15 +230,38 @@ impl AiClient {
 
         let request_id = Self::request_id();
         log::info!(
-            "AI request: type={} id={}",
+            "AI request: type={} provider={} id={}",
             request.request_type,
+            self.provider_kind,
             request_id
         );
+
+        let result = if self.provider_kind == "bedrock" {
+            // Bedrock: send full JSON to Lambda (Lambda constructs prompts)
+            self.call_bedrock(request)
+        } else {
+            // Direct providers: build prompts client-side
+            self.call_direct(request)
+        };
+
+        // Cache on success
+        if let Ok(ref response) = result {
+            self.set_cached(ckey, response.clone());
+        }
+
+        result
+    }
+
+    /// Bedrock path: send full MentorRequest as JSON to Lambda.
+    fn call_bedrock(&self, request: &MentorRequest) -> Result<String> {
+        let body = serde_json::to_value(request).context("Failed to serialize request")?;
+
+        // Downcast provider to BedrockProvider to use call_raw
+        // This is safe because we only reach here when provider_kind == "bedrock"
         let mut last_error = None;
 
         for attempt in 0..=MAX_RETRIES {
             if attempt > 0 {
-                // Exponential backoff: 500ms, 1s
                 std::thread::sleep(std::time::Duration::from_millis(
                     500 * 2u64.pow(attempt - 1),
                 ));
@@ -230,35 +272,29 @@ impl AiClient {
                 .post(&self.endpoint)
                 .header("Content-Type", "application/json")
                 .header("x-api-key", &self.api_key)
-                .header("x-request-id", &request_id)
-                .json(request)
+                .header("x-request-id", Self::request_id())
+                .json(&body)
                 .send();
 
             match send_result {
                 Ok(resp) => {
                     let status = resp.status();
 
-                    // Don't retry client errors (4xx) — they won't change
                     if status.is_client_error() {
                         return self.parse_error_response(resp, status.as_u16());
                     }
 
-                    // Retry server errors (5xx)
                     if status.is_server_error() {
                         last_error = Some(anyhow::anyhow!(classify_http_error(status.as_u16())));
                         continue;
                     }
 
-                    // Success — parse and cache
-                    let response = self.parse_success_response(resp)?;
-                    self.set_cached(ckey, response.clone());
-                    return Ok(response);
+                    return self.parse_success_response(resp);
                 }
                 Err(e) => {
-                    // On first attempt, detect offline state
                     if attempt == 0 && e.is_connect() {
                         return Err(anyhow::anyhow!(
-                            "You appear to be offline — cannot reach AI service. Check your internet connection."
+                            "You appear to be offline — cannot reach AI service."
                         ));
                     }
                     last_error = Some(classify_request_error(e));
@@ -270,6 +306,7 @@ impl AiClient {
         Err(last_error.unwrap_or_else(|| anyhow::anyhow!("AI request failed after retries")))
     }
 
+    /// Parse a successful Bedrock/Lambda response.
     fn parse_success_response(&self, resp: reqwest::blocking::Response) -> Result<String> {
         let body: MentorApiResponse = resp.json().context("Failed to parse AI mentor response")?;
 
@@ -285,18 +322,62 @@ impl AiClient {
             .ok_or_else(|| anyhow::anyhow!("Empty response from AI mentor"))
     }
 
+    /// Parse an error response from Bedrock/Lambda.
     fn parse_error_response(
         &self,
         resp: reqwest::blocking::Response,
         status: u16,
     ) -> Result<String> {
-        // Try to extract a meaningful error message from the body
         if let Ok(body) = resp.json::<MentorApiResponse>() {
             if let Some(err) = body.error {
                 anyhow::bail!("{}", err);
             }
         }
         anyhow::bail!("{}", classify_http_error(status));
+    }
+
+    /// Direct provider path: build prompts client-side, call provider.chat().
+    fn call_direct(&self, request: &MentorRequest) -> Result<String> {
+        let ctx = request.context.as_ref().cloned().unwrap_or_else(|| RepoContext {
+            branch: None,
+            staged_files: vec![],
+            unstaged_files: vec![],
+            diff_stats: None,
+            diff: None,
+            conflict_files: vec![],
+            conflict_diff: None,
+            has_conflicts: false,
+            merge_type: None,
+            detached_head: false,
+        });
+
+        let system_prompt = prompts::system_prompt_for(&request.request_type);
+        let user_message = prompts::build_user_message(
+            &request.request_type,
+            &ctx,
+            request.query.as_deref(),
+            request.error.as_deref(),
+        );
+
+        // Retry with backoff
+        let mut last_error = None;
+        for attempt in 0..=MAX_RETRIES {
+            if attempt > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(
+                    500 * 2u64.pow(attempt - 1),
+                ));
+            }
+
+            match self.provider.chat(system_prompt, &user_message) {
+                Ok(response) => return Ok(response),
+                Err(e) => {
+                    last_error = Some(e);
+                    continue;
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("AI request failed after retries")))
     }
 
     /// Suggest a commit message based on staged changes.
@@ -347,23 +428,9 @@ impl AiClient {
         self.call(&request)
     }
 
-    /// Check if the AI service is reachable. Returns the health response or an error.
+    /// Check if the AI service is reachable.
     pub fn health_check(&self) -> Result<String> {
-        // The health endpoint is the mentor endpoint's sibling path
-        let health_url = self.endpoint.replace("/mentor", "/health");
-
-        let resp = self
-            .client
-            .get(&health_url)
-            .header("x-api-key", &self.api_key)
-            .send()
-            .context("Cannot reach AI service")?;
-
-        if resp.status().is_success() {
-            Ok("AI service is healthy and connected".to_string())
-        } else {
-            anyhow::bail!(classify_http_error(resp.status().as_u16()));
-        }
+        self.provider.health_check()
     }
 
     /// Review a specific file's diff using AI. Returns review comments/suggestions.
@@ -515,9 +582,9 @@ impl AiClient {
     }
 
     /// Check if the client is configured and reachable (quick check, no API call).
-    #[allow(dead_code)] // Public utility — used in tests and available for consumers
+    #[allow(dead_code)]
     pub fn is_configured(&self) -> bool {
-        !self.endpoint.is_empty() && !self.api_key.is_empty()
+        !self.provider_kind.is_empty()
     }
 }
 
@@ -797,12 +864,16 @@ mod tests {
     // ── Cache get/set tests ──────────────────────────────────────
 
     fn make_test_client() -> AiClient {
-        AiClient {
-            endpoint: "https://example.com/mentor".to_string(),
-            api_key: "test-key".to_string(),
-            client: reqwest::blocking::Client::new(),
-            cache: Arc::new(Mutex::new(HashMap::new())),
-        }
+        // Create a dummy bedrock-style client for cache tests
+        let config = AiConfig {
+            enabled: true,
+            provider: "bedrock".to_string(),
+            model: None,
+            endpoint: Some("https://example.com/mentor".to_string()),
+            api_key: Some("test-key-12345".to_string()),
+            timeout_secs: Some(30),
+        };
+        AiClient::from_config(&config).expect("test client should build")
     }
 
     #[test]
@@ -910,14 +981,18 @@ mod tests {
     }
 
     #[test]
-    fn test_from_config_bad_scheme_returns_none() {
+    fn test_from_config_bad_scheme_caught_by_validate() {
         let cfg = AiConfig {
             enabled: true,
             endpoint: Some("ftp://example.com/mentor".to_string()),
-            api_key: Some("key123".to_string()),
+            api_key: Some("key123456789".to_string()),
             ..AiConfig::default()
         };
-        assert!(AiClient::from_config(&cfg).is_none());
+        // from_config now creates the client (scheme is checked by validate())
+        assert!(AiClient::from_config(&cfg).is_some());
+        // But validate() should flag the bad scheme
+        let issues = cfg.validate();
+        assert!(issues.iter().any(|i| i.contains("must start with https://")));
     }
 
     // ── is_configured tests ──────────────────────────────────────

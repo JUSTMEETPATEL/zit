@@ -90,10 +90,17 @@ pub struct AiConfig {
     /// Enable AI mentor features.
     #[serde(default)]
     pub enabled: bool,
-    /// API Gateway endpoint URL (e.g. https://xxx.execute-api.region.amazonaws.com/dev/mentor).
+    /// AI provider: "bedrock" (default), "openai", "anthropic", "openrouter", "ollama".
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    /// Model name (provider-specific). Each provider has a sensible default.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// API endpoint URL. Required for bedrock (Lambda URL). Optional for ollama
+    /// (defaults to http://localhost:11434). Ignored for openai/anthropic/openrouter.
     #[serde(default)]
     pub endpoint: Option<String>,
-    /// API key for the API Gateway.
+    /// API key. Required for all providers except ollama.
     #[serde(default)]
     pub api_key: Option<String>,
     /// Request timeout in seconds.
@@ -101,10 +108,67 @@ pub struct AiConfig {
     pub timeout_secs: Option<u64>,
 }
 
+fn default_provider() -> String {
+    "bedrock".to_string()
+}
+
+/// All supported AI provider names.
+pub const VALID_PROVIDERS: &[&str] = &["bedrock", "openai", "anthropic", "openrouter", "ollama"];
+
+impl AiConfig {
+    /// Get the effective provider name, normalized to lowercase.
+    pub fn effective_provider(&self) -> &str {
+        if self.provider.is_empty() {
+            "bedrock"
+        } else {
+            &self.provider
+        }
+    }
+
+    /// Get the effective model name, falling back to a per-provider default.
+    pub fn effective_model(&self) -> String {
+        if let Some(ref m) = self.model {
+            if !m.is_empty() {
+                return m.clone();
+            }
+        }
+        match self.effective_provider() {
+            "openai" => "gpt-4o".to_string(),
+            "anthropic" => "claude-sonnet-4-20250514".to_string(),
+            "openrouter" => "anthropic/claude-sonnet-4-20250514".to_string(),
+            "ollama" => "llama3.1".to_string(),
+            _ => "claude-3-sonnet".to_string(), // bedrock default (display only)
+        }
+    }
+
+    /// Get the effective endpoint, falling back to per-provider defaults.
+    pub fn effective_endpoint(&self) -> Option<String> {
+        // Config file, then env var
+        let from_config = self.endpoint
+            .clone()
+            .or_else(|| std::env::var("ZIT_AI_ENDPOINT").ok());
+
+        if from_config.is_some() {
+            return from_config;
+        }
+
+        // Provider-specific defaults
+        match self.effective_provider() {
+            "openai" => Some("https://api.openai.com/v1/chat/completions".to_string()),
+            "anthropic" => Some("https://api.anthropic.com/v1/messages".to_string()),
+            "openrouter" => Some("https://openrouter.ai/api/v1/chat/completions".to_string()),
+            "ollama" => Some("http://localhost:11434".to_string()),
+            _ => None, // bedrock requires explicit endpoint
+        }
+    }
+}
+
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            provider: default_provider(),
+            model: None,
             endpoint: None,
             api_key: None,
             timeout_secs: Some(30),
@@ -126,10 +190,9 @@ impl AiConfig {
     }
 
     /// Resolve endpoint: config file first, then ZIT_AI_ENDPOINT env var.
+    /// (Legacy helper — prefer effective_endpoint() for provider-aware resolution.)
     pub fn resolved_endpoint(&self) -> Option<String> {
-        self.endpoint
-            .clone()
-            .or_else(|| std::env::var("ZIT_AI_ENDPOINT").ok())
+        self.effective_endpoint()
     }
 
     /// Validate the AI configuration and return a list of issues (empty = valid).
@@ -140,35 +203,62 @@ impl AiConfig {
             return issues; // Not enabled, nothing to validate
         }
 
-        // Check endpoint
-        match self.resolved_endpoint() {
-            None => issues.push(
-                "AI endpoint not set — add 'endpoint' to [ai] config or set ZIT_AI_ENDPOINT"
-                    .to_string(),
-            ),
-            Some(ref url) => {
-                if !url.starts_with("https://") && !url.starts_with("http://") {
-                    issues.push(format!(
-                        "AI endpoint must start with https:// or http://, got: {}",
-                        url
-                    ));
+        let provider = self.effective_provider();
+
+        // Check provider is valid
+        if !VALID_PROVIDERS.contains(&provider) {
+            issues.push(format!(
+                "Unknown AI provider '{}'. Must be one of: {}",
+                provider,
+                VALID_PROVIDERS.join(", ")
+            ));
+            return issues;
+        }
+
+        // Check endpoint (required for bedrock, optional for ollama, ignored for others)
+        match provider {
+            "bedrock" => {
+                match self.endpoint.as_ref().or(std::env::var("ZIT_AI_ENDPOINT").ok().as_ref()) {
+                    None => issues.push(
+                        "Bedrock requires an endpoint — set your Lambda API Gateway URL".to_string(),
+                    ),
+                    Some(ref url) => {
+                        if !url.starts_with("https://") && !url.starts_with("http://") {
+                            issues.push(format!(
+                                "AI endpoint must start with https:// or http://, got: {}",
+                                url
+                            ));
+                        }
+                    }
                 }
-                if !url.contains('.') {
-                    issues.push("AI endpoint URL doesn't look like a valid domain".to_string());
+            }
+            "ollama" => {
+                // Endpoint is optional for ollama (defaults to localhost)
+            }
+            _ => {
+                // openai, anthropic, openrouter have built-in endpoints
+            }
+        }
+
+        // Check API key (required for all except ollama)
+        if provider != "ollama" {
+            if self.resolved_api_key().is_none() {
+                issues.push(format!(
+                    "API key required for '{}' — add 'api_key' to [ai] config or set ZIT_AI_API_KEY",
+                    provider
+                ));
+            } else if let Some(ref key) = self.resolved_api_key() {
+                if key.len() < 8 {
+                    issues.push("AI API key seems too short (< 8 chars)".to_string());
                 }
             }
         }
 
-        // Check API key
-        if self.resolved_api_key().is_none() {
+        // Check model (required for openrouter)
+        if provider == "openrouter" && self.model.is_none() {
             issues.push(
-                "AI API key not set — add 'api_key' to [ai] config or set ZIT_AI_API_KEY"
-                    .to_string(),
+                "OpenRouter requires a model — e.g. model = \"anthropic/claude-sonnet-4-20250514\"".to_string(),
             );
-        } else if let Some(ref key) = self.resolved_api_key() {
-            if key.len() < 8 {
-                issues.push("AI API key seems too short (< 8 chars)".to_string());
-            }
         }
 
         // Check timeout
@@ -185,9 +275,17 @@ impl AiConfig {
         issues
     }
 
-    /// Check if AI is properly configured (enabled + endpoint + api_key).
+    /// Check if AI is properly configured.
     pub fn is_ready(&self) -> bool {
-        self.enabled && self.resolved_endpoint().is_some() && self.resolved_api_key().is_some()
+        if !self.enabled {
+            return false;
+        }
+        let provider = self.effective_provider();
+        match provider {
+            "ollama" => self.effective_endpoint().is_some(),
+            "bedrock" => self.effective_endpoint().is_some() && self.resolved_api_key().is_some(),
+            _ => self.resolved_api_key().is_some(), // openai, anthropic, openrouter
+        }
     }
 }
 
@@ -238,6 +336,18 @@ impl Config {
 mod tests {
     use super::*;
 
+    /// Helper: create a bedrock-style AiConfig (the default provider).
+    fn bedrock_config() -> AiConfig {
+        AiConfig {
+            enabled: true,
+            provider: "bedrock".to_string(),
+            model: None,
+            endpoint: Some("https://api.example.com/mentor".to_string()),
+            api_key: Some("test-api-key-12345".to_string()),
+            timeout_secs: Some(30),
+        }
+    }
+
     // ── GeneralConfig defaults ──────────────────────────────────────
     #[test]
     fn test_general_config_defaults() {
@@ -259,9 +369,37 @@ mod tests {
     fn test_ai_config_defaults() {
         let a = AiConfig::default();
         assert!(!a.enabled);
+        assert_eq!(a.provider, "bedrock");
+        assert!(a.model.is_none());
         assert!(a.endpoint.is_none());
         assert!(a.api_key.is_none());
         assert_eq!(a.timeout_secs, Some(30));
+    }
+
+    #[test]
+    fn test_ai_default_provider_is_bedrock() {
+        let a = AiConfig::default();
+        assert_eq!(a.effective_provider(), "bedrock");
+    }
+
+    #[test]
+    fn test_ai_effective_model_defaults() {
+        let mut a = AiConfig::default();
+        a.provider = "openai".to_string();
+        assert_eq!(a.effective_model(), "gpt-4o");
+        a.provider = "ollama".to_string();
+        assert_eq!(a.effective_model(), "llama3.1");
+        a.provider = "anthropic".to_string();
+        assert_eq!(a.effective_model(), "claude-sonnet-4-20250514");
+    }
+
+    #[test]
+    fn test_ai_effective_model_custom() {
+        let a = AiConfig {
+            model: Some("my-model".to_string()),
+            ..AiConfig::default()
+        };
+        assert_eq!(a.effective_model(), "my-model");
     }
 
     // ── AiConfig::is_ready ──────────────────────────────────────────
@@ -273,49 +411,69 @@ mod tests {
 
     #[test]
     fn test_ai_ready_when_fully_configured() {
+        assert!(bedrock_config().is_ready());
+    }
+
+    #[test]
+    fn test_ai_not_ready_if_disabled() {
+        let mut a = bedrock_config();
+        a.enabled = false;
+        assert!(!a.is_ready());
+    }
+
+    #[test]
+    fn test_ai_not_ready_missing_endpoint() {
+        std::env::remove_var("ZIT_AI_ENDPOINT");
         let a = AiConfig {
             enabled: true,
-            endpoint: Some("https://api.example.com/mentor".to_string()),
-            api_key: Some("test-api-key-12345".to_string()),
+            provider: "bedrock".to_string(),
+            model: None,
+            endpoint: None,
+            api_key: Some("key12345".to_string()),
+            timeout_secs: Some(30),
+        };
+        assert!(!a.is_ready());
+    }
+
+    #[test]
+    fn test_ai_not_ready_missing_key() {
+        std::env::remove_var("ZIT_AI_API_KEY");
+        let a = AiConfig {
+            enabled: true,
+            provider: "bedrock".to_string(),
+            model: None,
+            endpoint: Some("https://api.example.com".to_string()),
+            api_key: None,
+            timeout_secs: Some(30),
+        };
+        assert!(!a.is_ready());
+    }
+
+    #[test]
+    fn test_ollama_ready_without_key() {
+        std::env::remove_var("ZIT_AI_API_KEY");
+        let a = AiConfig {
+            enabled: true,
+            provider: "ollama".to_string(),
+            model: None,
+            endpoint: None, // will default to localhost
+            api_key: None,
             timeout_secs: Some(30),
         };
         assert!(a.is_ready());
     }
 
     #[test]
-    fn test_ai_not_ready_if_disabled() {
-        let a = AiConfig {
-            enabled: false,
-            endpoint: Some("https://api.example.com".to_string()),
-            api_key: Some("key12345".to_string()),
-            timeout_secs: Some(30),
-        };
-        assert!(!a.is_ready());
-    }
-
-    #[test]
-    fn test_ai_not_ready_missing_endpoint() {
+    fn test_openai_ready_with_key_only() {
         let a = AiConfig {
             enabled: true,
-            endpoint: None,
-            api_key: Some("key12345".to_string()),
+            provider: "openai".to_string(),
+            model: None,
+            endpoint: None, // has built-in default
+            api_key: Some("sk-test12345678".to_string()),
             timeout_secs: Some(30),
         };
-        // Also remove any env var to ensure no fallback
-        std::env::remove_var("ZIT_AI_ENDPOINT");
-        assert!(!a.is_ready());
-    }
-
-    #[test]
-    fn test_ai_not_ready_missing_key() {
-        let a = AiConfig {
-            enabled: true,
-            endpoint: Some("https://api.example.com".to_string()),
-            api_key: None,
-            timeout_secs: Some(30),
-        };
-        std::env::remove_var("ZIT_AI_API_KEY");
-        assert!(!a.is_ready());
+        assert!(a.is_ready());
     }
 
     // ── AiConfig::validate ──────────────────────────────────────────
@@ -326,23 +484,26 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_no_endpoint() {
+    fn test_validate_bedrock_no_endpoint() {
         std::env::remove_var("ZIT_AI_ENDPOINT");
-        std::env::remove_var("ZIT_AI_API_KEY");
         let a = AiConfig {
             enabled: true,
+            provider: "bedrock".to_string(),
+            model: None,
             endpoint: None,
             api_key: Some("test-key-1234".to_string()),
             timeout_secs: Some(30),
         };
         let issues = a.validate();
-        assert!(issues.iter().any(|i| i.contains("endpoint not set")));
+        assert!(issues.iter().any(|i| i.contains("endpoint")));
     }
 
     #[test]
     fn test_validate_bad_endpoint_scheme() {
         let a = AiConfig {
             enabled: true,
+            provider: "bedrock".to_string(),
+            model: None,
             endpoint: Some("ftp://example.com".to_string()),
             api_key: Some("test-key-1234".to_string()),
             timeout_secs: Some(30),
@@ -357,6 +518,8 @@ mod tests {
     fn test_validate_short_api_key() {
         let a = AiConfig {
             enabled: true,
+            provider: "bedrock".to_string(),
+            model: None,
             endpoint: Some("https://api.example.com".to_string()),
             api_key: Some("abc".to_string()),
             timeout_secs: Some(30),
@@ -367,34 +530,48 @@ mod tests {
 
     #[test]
     fn test_validate_zero_timeout() {
-        let a = AiConfig {
-            enabled: true,
-            endpoint: Some("https://api.example.com".to_string()),
-            api_key: Some("test-key-1234".to_string()),
-            timeout_secs: Some(0),
-        };
+        let mut a = bedrock_config();
+        a.timeout_secs = Some(0);
         let issues = a.validate();
         assert!(issues.iter().any(|i| i.contains("must be > 0")));
     }
 
     #[test]
     fn test_validate_high_timeout() {
-        let a = AiConfig {
-            enabled: true,
-            endpoint: Some("https://api.example.com".to_string()),
-            api_key: Some("test-key-1234".to_string()),
-            timeout_secs: Some(300),
-        };
+        let mut a = bedrock_config();
+        a.timeout_secs = Some(300);
         let issues = a.validate();
         assert!(issues.iter().any(|i| i.contains("unusually high")));
     }
 
     #[test]
     fn test_validate_all_good() {
+        assert!(bedrock_config().validate().is_empty());
+    }
+
+    #[test]
+    fn test_validate_unknown_provider() {
         let a = AiConfig {
             enabled: true,
-            endpoint: Some("https://api.example.com/mentor".to_string()),
-            api_key: Some("test-key-1234".to_string()),
+            provider: "unknown".to_string(),
+            model: None,
+            endpoint: None,
+            api_key: None,
+            timeout_secs: None,
+        };
+        let issues = a.validate();
+        assert!(issues.iter().any(|i| i.contains("Unknown AI provider")));
+    }
+
+    #[test]
+    fn test_validate_ollama_no_key_ok() {
+        std::env::remove_var("ZIT_AI_API_KEY");
+        let a = AiConfig {
+            enabled: true,
+            provider: "ollama".to_string(),
+            model: None,
+            endpoint: None,
+            api_key: None,
             timeout_secs: Some(30),
         };
         assert!(a.validate().is_empty());
@@ -446,7 +623,9 @@ mod tests {
             },
             ai: AiConfig {
                 enabled: true,
-                endpoint: Some("https://x.com".to_string()),
+                provider: "openai".to_string(),
+                model: Some("gpt-4o".to_string()),
+                endpoint: None,
                 api_key: Some("key123456".to_string()),
                 timeout_secs: Some(60),
             },
@@ -458,6 +637,8 @@ mod tests {
         assert_eq!(parsed.github.pat, Some("ghp_test".to_string()));
         assert_eq!(parsed.ui.color_scheme, "dark");
         assert!(parsed.ai.enabled);
+        assert_eq!(parsed.ai.provider, "openai");
+        assert_eq!(parsed.ai.model, Some("gpt-4o".to_string()));
     }
 
     // ── Config::default has expected values ──────────────────────────
@@ -467,6 +648,7 @@ mod tests {
         assert_eq!(config.general.tick_rate_ms, 2000);
         assert!(config.general.confirm_destructive);
         assert!(!config.ai.enabled);
+        assert_eq!(config.ai.provider, "bedrock");
         assert_eq!(config.ui.color_scheme, "default");
     }
 
@@ -475,10 +657,8 @@ mod tests {
     fn test_resolved_endpoint_prefers_config() {
         std::env::set_var("ZIT_AI_ENDPOINT", "https://env.example.com");
         let a = AiConfig {
-            enabled: true,
             endpoint: Some("https://config.example.com".to_string()),
-            api_key: None,
-            timeout_secs: None,
+            ..AiConfig::default()
         };
         assert_eq!(a.resolved_endpoint().unwrap(), "https://config.example.com");
         std::env::remove_var("ZIT_AI_ENDPOINT");
@@ -488,12 +668,23 @@ mod tests {
     fn test_resolved_endpoint_env_fallback() {
         std::env::set_var("ZIT_AI_ENDPOINT", "https://env.example.com");
         let a = AiConfig {
-            enabled: true,
             endpoint: None,
-            api_key: None,
-            timeout_secs: None,
+            ..AiConfig::default()
         };
         assert_eq!(a.resolved_endpoint().unwrap(), "https://env.example.com");
         std::env::remove_var("ZIT_AI_ENDPOINT");
     }
+
+    #[test]
+    fn test_effective_endpoint_provider_defaults() {
+        std::env::remove_var("ZIT_AI_ENDPOINT");
+        let mut a = AiConfig::default();
+        a.provider = "openai".to_string();
+        assert!(a.effective_endpoint().unwrap().contains("openai.com"));
+        a.provider = "ollama".to_string();
+        assert!(a.effective_endpoint().unwrap().contains("localhost:11434"));
+        a.provider = "bedrock".to_string();
+        assert!(a.effective_endpoint().is_none()); // bedrock requires explicit
+    }
 }
+
