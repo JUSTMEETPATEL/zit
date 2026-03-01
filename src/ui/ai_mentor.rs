@@ -128,9 +128,10 @@ const MENU_ITEMS: &[(&str, &str)] = &[
     ("📚 Learn", "Learn a git concept with examples"),
     ("🏥 Health Check", "Test connectivity to the AI service"),
     ("📜 History", "View past AI interactions"),
+    ("⚙️  Switch Provider", "Change AI provider (OpenAI, Anthropic, Ollama...)"),
 ];
 
-pub fn render(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: bool, loading: bool) {
+pub fn render(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: bool, loading: bool, provider_label: &str) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -149,6 +150,16 @@ pub fn render(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: bo
         Span::styled(" ○ Not configured ", Style::default().fg(Color::Red))
     };
 
+    // Provider info in title
+    let provider_info = if ai_available && !provider_label.is_empty() {
+        Span::styled(
+            format!(" [{}] ", provider_label),
+            Style::default().fg(Color::DarkGray),
+        )
+    } else {
+        Span::raw("")
+    };
+
     let title = Paragraph::new(Line::from(vec![
         Span::styled(
             "🤖 AI Mentor",
@@ -158,6 +169,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: bo
         ),
         Span::raw(" — "),
         ai_status,
+        provider_info,
     ]))
     .block(
         Block::default()
@@ -181,6 +193,8 @@ pub fn render(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: bo
             Span::raw("Navigate  "),
             Span::styled("Enter ", Style::default().fg(Color::Cyan)),
             Span::raw("Select  "),
+            Span::styled("p ", Style::default().fg(Color::Yellow)),
+            Span::raw("Switch Provider  "),
             Span::styled("q ", Style::default().fg(Color::Red)),
             Span::raw("Back"),
         ]),
@@ -249,28 +263,11 @@ fn render_menu(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: b
     if !ai_available {
         lines.push(Line::from(Span::raw("")));
         lines.push(Line::from(Span::styled(
-            "  ⚠ AI not configured. Add to ~/.config/zit/config.toml:",
+            "  ⚠ AI not configured. Press Enter or 'p' to set up a provider.",
             Style::default().fg(Color::Yellow),
         )));
         lines.push(Line::from(Span::styled(
-            "    [ai]",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "    enabled = true",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "    endpoint = \"https://your-api.execute-api.region.amazonaws.com/dev/mentor\"",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::styled(
-            "    api_key = \"your-api-key\"",
-            Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(Span::raw("")));
-        lines.push(Line::from(Span::styled(
-            "  Or set env vars: ZIT_AI_ENDPOINT + ZIT_AI_API_KEY",
+            "    Supports: Bedrock, OpenAI, Anthropic, OpenRouter, Ollama",
             Style::default().fg(Color::DarkGray),
         )));
     }
@@ -464,8 +461,8 @@ fn handle_menu_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<(
             }
         }
         KeyCode::Enter => {
-            if app.ai_client.is_none() && app.ai_mentor_state.selected != 5 {
-                // Launch interactive AI setup wizard (except for history which doesn't need AI)
+            if app.ai_client.is_none() && app.ai_mentor_state.selected != 5 && app.ai_mentor_state.selected != 6 {
+                // Launch interactive AI setup wizard (except for history/switch which don't need AI)
                 app.start_ai_setup();
                 return Ok(());
             }
@@ -504,8 +501,16 @@ fn handle_menu_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<(
                     app.ai_mentor_state.history_selected = 0;
                     app.ai_mentor_state.history_scroll = 0;
                 }
+                6 => {
+                    // Switch Provider — launch setup wizard
+                    app.start_ai_setup();
+                }
                 _ => {}
             }
+        }
+        KeyCode::Char('p') => {
+            // Quick key to switch provider
+            app.start_ai_setup();
         }
         _ => {}
     }

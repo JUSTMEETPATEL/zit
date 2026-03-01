@@ -103,6 +103,7 @@ pub enum InputAction {
     CommitMessage,
     AddCollaborator,
     AiSetupProvider,
+    AiSetupModel,
     AiSetupEndpoint,
     AiSetupApiKey,
     StashPush,
@@ -576,6 +577,7 @@ impl App {
             && !matches!(
                 action,
                 InputAction::AiSetupProvider
+                | InputAction::AiSetupModel
                 | InputAction::AiSetupEndpoint
                 | InputAction::AiSetupApiKey
                 | InputAction::StashPush
@@ -673,8 +675,17 @@ impl App {
                             on_submit: InputAction::AiSetupEndpoint,
                         };
                     }
+                    "openrouter" => {
+                        // OpenRouter: ask for model first, then API key
+                        self.popup = Popup::Input {
+                            title: "🤖 AI Setup — OpenRouter (2/3)".to_string(),
+                            prompt: "Model (e.g. anthropic/claude-sonnet-4-20250514): ".to_string(),
+                            value: self.config.ai.model.clone().unwrap_or_else(|| "anthropic/claude-sonnet-4-20250514".to_string()),
+                            on_submit: InputAction::AiSetupModel,
+                        };
+                    }
                     _ => {
-                        // OpenAI, Anthropic, OpenRouter: go straight to API key
+                        // OpenAI, Anthropic: go straight to API key
                         self.ai_setup_endpoint = None;
                         self.popup = Popup::Input {
                             title: format!("🤖 AI Setup — {} (2/2)", provider),
@@ -684,6 +695,19 @@ impl App {
                         };
                     }
                 }
+            }
+            InputAction::AiSetupModel => {
+                // OpenRouter model selection — then ask for API key
+                let model = value.trim().to_string();
+                if !model.is_empty() {
+                    self.config.ai.model = Some(model);
+                }
+                self.popup = Popup::Input {
+                    title: "🤖 AI Setup — OpenRouter (3/3)".to_string(),
+                    prompt: "API Key (Bearer token): ".to_string(),
+                    value: self.config.ai.resolved_api_key().unwrap_or_default(),
+                    on_submit: InputAction::AiSetupApiKey,
+                };
             }
             InputAction::AiSetupEndpoint => {
                 let endpoint = value.trim().to_string();

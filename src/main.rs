@@ -236,7 +236,12 @@ fn draw(f: &mut Frame, app: &mut App) {
         View::AiMentor => {
             let ai_available = app.ai_client.is_some();
             let loading = app.ai_loading;
-            ui::ai_mentor::render(f, area, &app.ai_mentor_state, ai_available, loading);
+            let provider_label = app
+                .ai_client
+                .as_ref()
+                .map(|c| c.provider_name().to_string())
+                .unwrap_or_default();
+            ui::ai_mentor::render(f, area, &app.ai_mentor_state, ai_available, loading, &provider_label);
         }
         View::Stash => {
             ui::stash::render(f, area, &mut app.stash_state);
