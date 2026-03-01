@@ -48,17 +48,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install cross
-        if: runner.os == 'Linux'
+      - name: Install cross (aarch64-linux only)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: cargo install cross --git https://github.com/cross-rs/cross
 
-      - name: Build (Windows/macOS)
-        if: runner.os != 'Linux'
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Build (Linux)
-        if: runner.os == 'Linux'
+      - name: Build (aarch64-linux)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build (other targets)
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package (unix)
         if: runner.os != 'Windows'
