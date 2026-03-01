@@ -1185,11 +1185,14 @@ impl App {
                         }
                         Some(AiAction::MergeResolve(file_path)) => {
                             // Parse AI response and populate merge resolve state
+                            log::debug!("[MergeResolve] AI response received for {}, len={}", file_path, response.len());
                             self.merge_resolve_state.ai_suggestion = Some(response.clone());
                             self.merge_resolve_state.ai_resolved_content =
                                 parse_ai_resolved_content(&response);
                             self.merge_resolve_state.ai_recommendation =
                                 parse_ai_recommendation(&response);
+                            log::debug!("[MergeResolve] ai_suggestion set: {}", self.merge_resolve_state.ai_suggestion.is_some());
+                            log::debug!("[MergeResolve] ai_resolved_content set: {}", self.merge_resolve_state.ai_resolved_content.is_some());
                             self.set_status(format!("✓ AI resolution ready for {}", file_path));
                             // Generate follow-up suggestions
                             let follow_ups =
@@ -1237,6 +1240,7 @@ impl App {
                     }
                 }
                 Ok(Err(e)) => {
+                    log::debug!("[AI] poll_ai_result: ERROR action={:?} err={}", self.ai_action, e);
                     self.set_status(format!("AI error: {}", e));
                     self.ai_loading = false;
                     self.ai_receiver = None;
@@ -1246,6 +1250,7 @@ impl App {
                     // Still waiting — nothing to do
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
+                    log::debug!("[AI] poll_ai_result: DISCONNECTED action={:?}", self.ai_action);
                     self.set_status("AI request was interrupted");
                     self.ai_loading = false;
                     self.ai_receiver = None;
