@@ -51,6 +51,13 @@ pub struct MergeResolveState {
 
 impl MergeResolveState {
     pub fn refresh(&mut self) {
+        // Save AI state so it survives the reload
+        let saved_ai_suggestion = self.ai_suggestion.take();
+        let saved_ai_recommendation = self.ai_recommendation.take();
+        let saved_ai_resolved_content = self.ai_resolved_content.take();
+        let saved_follow_ups = std::mem::take(&mut self.follow_ups);
+        let saved_scroll_center = self.scroll_center;
+
         // Refresh conflict list
         let status = git::status::get_status().unwrap_or_default();
         self.conflicted_files = status.conflicts;
@@ -63,6 +70,15 @@ impl MergeResolveState {
 
         // Load the selected file
         self.load_selected_file();
+
+        // Restore AI state
+        if saved_ai_suggestion.is_some() {
+            self.ai_suggestion = saved_ai_suggestion;
+            self.ai_recommendation = saved_ai_recommendation;
+            self.ai_resolved_content = saved_ai_resolved_content;
+            self.follow_ups = saved_follow_ups;
+            self.scroll_center = saved_scroll_center;
+        }
     }
 
     pub fn load_selected_file(&mut self) {
