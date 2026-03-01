@@ -135,31 +135,54 @@ impl AiConfig {
         match self.effective_provider() {
             "openai" => "gpt-4o".to_string(),
             "anthropic" => "claude-sonnet-4-20250514".to_string(),
-            "openrouter" => "anthropic/claude-sonnet-4-20250514".to_string(),
+            "openrouter" => "anthropic/claude-sonnet-4".to_string(),
             "ollama" => "llama3.1".to_string(),
             _ => "claude-3-sonnet".to_string(), // bedrock default (display only)
         }
     }
 
     /// Get the effective endpoint, falling back to per-provider defaults.
+    /// Ignores a saved endpoint if it appears to belong to a different provider.
     pub fn effective_endpoint(&self) -> Option<String> {
+        let provider = self.effective_provider();
+
+        // Provider-specific defaults
+        let default_for_provider = match provider {
+            "openai" => Some("https://api.openai.com/v1/chat/completions"),
+            "anthropic" => Some("https://api.anthropic.com/v1/messages"),
+            "openrouter" => Some("https://openrouter.ai/api/v1/chat/completions"),
+            "ollama" => Some("http://localhost:11434"),
+            _ => None, // bedrock requires explicit endpoint
+        };
+
         // Config file, then env var
         let from_config = self.endpoint
             .clone()
             .or_else(|| std::env::var("ZIT_AI_ENDPOINT").ok());
 
-        if from_config.is_some() {
+        if let Some(ref ep) = from_config {
+            // If a known provider has a default, check if the saved endpoint
+            // belongs to a different provider (e.g. old Bedrock Lambda URL
+            // still saved when switching to OpenRouter).
+            if default_for_provider.is_some() {
+                let is_stale = (provider != "bedrock" && ep.contains("amazonaws.com"))
+                    || (provider != "openai" && ep.contains("api.openai.com"))
+                    || (provider != "anthropic" && ep.contains("api.anthropic.com"))
+                    || (provider != "openrouter" && ep.contains("openrouter.ai"))
+                    || (provider != "ollama" && ep.contains("localhost:11434"));
+
+                if is_stale {
+                    log::debug!(
+                        "[config] Ignoring stale endpoint '{}' for provider '{}', using default",
+                        ep, provider
+                    );
+                    return default_for_provider.map(|s| s.to_string());
+                }
+            }
             return from_config;
         }
 
-        // Provider-specific defaults
-        match self.effective_provider() {
-            "openai" => Some("https://api.openai.com/v1/chat/completions".to_string()),
-            "anthropic" => Some("https://api.anthropic.com/v1/messages".to_string()),
-            "openrouter" => Some("https://openrouter.ai/api/v1/chat/completions".to_string()),
-            "ollama" => Some("http://localhost:11434".to_string()),
-            _ => None, // bedrock requires explicit endpoint
-        }
+        default_for_provider.map(|s| s.to_string())
     }
 }
 
@@ -257,7 +280,7 @@ impl AiConfig {
         // Check model (required for openrouter)
         if provider == "openrouter" && self.model.is_none() {
             issues.push(
-                "OpenRouter requires a model — e.g. model = \"anthropic/claude-sonnet-4-20250514\"".to_string(),
+                "OpenRouter requires a model — e.g. model = \"anthropic/claude-sonnet-4\"".to_string(),
             );
         }
 

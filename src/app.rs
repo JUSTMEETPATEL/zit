@@ -676,16 +676,19 @@ impl App {
                         };
                     }
                     "openrouter" => {
-                        // OpenRouter: ask for model first, then API key
+                        // OpenRouter: clear old endpoint, ask for model first, then API key
+                        self.config.ai.endpoint = None;
+                        self.ai_setup_endpoint = None;
                         self.popup = Popup::Input {
                             title: "🤖 AI Setup — OpenRouter (2/3)".to_string(),
-                            prompt: "Model (e.g. anthropic/claude-sonnet-4-20250514): ".to_string(),
-                            value: self.config.ai.model.clone().unwrap_or_else(|| "anthropic/claude-sonnet-4-20250514".to_string()),
+                            prompt: "Model (e.g. anthropic/claude-sonnet-4): ".to_string(),
+                            value: self.config.ai.model.clone().unwrap_or_else(|| "anthropic/claude-sonnet-4".to_string()),
                             on_submit: InputAction::AiSetupModel,
                         };
                     }
                     _ => {
-                        // OpenAI, Anthropic: go straight to API key
+                        // OpenAI, Anthropic: clear old endpoint, go straight to API key
+                        self.config.ai.endpoint = None;
                         self.ai_setup_endpoint = None;
                         self.popup = Popup::Input {
                             title: format!("🤖 AI Setup — {} (2/2)", provider),

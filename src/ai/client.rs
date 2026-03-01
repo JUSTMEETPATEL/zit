@@ -359,6 +359,14 @@ impl AiClient {
             request.error.as_deref(),
         );
 
+        log::debug!(
+            "[AI] call_direct: type={} provider={} prompt_len={} user_msg_len={}",
+            request.request_type,
+            self.provider_kind,
+            system_prompt.len(),
+            user_message.len()
+        );
+
         // Retry with backoff
         let mut last_error = None;
         for attempt in 0..=MAX_RETRIES {

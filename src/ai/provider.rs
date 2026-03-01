@@ -267,6 +267,10 @@ struct OpenAiError {
 
 impl AiProvider for OpenAiCompatibleProvider {
     fn chat(&self, system_prompt: &str, user_message: &str) -> Result<String> {
+        log::debug!(
+            "[{}] chat: endpoint={} model={}",
+            self.provider_name, self.endpoint, self.model
+        );
         let req = OpenAiRequest {
             model: self.model.clone(),
             messages: vec![
@@ -306,8 +310,10 @@ impl AiProvider for OpenAiCompatibleProvider {
 
         let status = resp.status().as_u16();
         let body_text = resp.text().unwrap_or_default();
+        log::debug!("[{}] response: status={} body_len={}", self.provider_name, status, body_text.len());
 
         if status != 200 {
+            log::error!("[{}] API error (HTTP {}): {}", self.provider_name, status, body_text);
             anyhow::bail!("{} API error (HTTP {}): {}", self.provider_name, status, body_text);
         }
 
