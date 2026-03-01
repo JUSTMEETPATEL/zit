@@ -970,13 +970,26 @@ impl App {
         commits_back: usize,
     ) {
         if self.ai_loading {
-            self.set_status("⏳ AI is already working...");
+            self.time_travel_state.ai_suggestion = Some(
+                "⏳ AI is already working on another request...\n\nPlease wait for it to finish, then try again."
+                    .to_string(),
+            );
             return;
         }
         let client = match self.ai_client {
             Some(ref c) => c.clone(),
             None => {
-                self.set_status("AI not configured — press 'a' to open AI Mentor and set up");
+                self.time_travel_state.ai_suggestion = Some(
+                    "⚠ AI is not configured.\n\n\
+                     To set up AI Mentor:\n\
+                     1. Press [Esc] to dismiss this panel\n\
+                     2. Press [q] to go back to Dashboard\n\
+                     3. Press [a] to open AI Mentor\n\
+                     4. Follow the setup wizard to add your API endpoint and key\n\n\
+                     Once configured, come back here and press [i] again!"
+                        .to_string(),
+                );
+                self.time_travel_state.ai_loading = false;
                 return;
             }
         };
