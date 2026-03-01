@@ -4,70 +4,31 @@
 
 Zit is an AI-powered, terminal-based Git and GitHub assistant designed to make Git accessible, safe, and educational for developers at all skill levels. The product eliminates the need to memorize complex Git commands by providing visual workflows, plain-English explanations, and AI-powered guidance—all within a keyboard-driven TUI. By executing real Git commands rather than reimplementing Git, Zit maintains compatibility and reliability while adding a safety and learning layer on top.
 
-## MVP Scope Definition
+## Scope
 
-### What Ships in MVP (v1.0)
+### Included Features
 
-The MVP focuses on core daily Git workflows with safety guardrails and basic AI guidance:
-
-**Core Workflows (P0)**:
+**Core Workflows**:
 - Repository dashboard with real-time status
 - File and hunk-level staging with diff preview
-- Guided commit creation with validation
-- Basic branch operations (create, switch, delete with safety checks)
+- Guided commit creation with validation and AI suggestions
+- Branch operations (create, switch, delete, rename with safety checks)
 - Commit history browsing with visual graph
-- GitHub repository creation and push
-
-**Safety Features (P0)**:
-- Confirmation dialogs for destructive operations
-- Clear warnings before data loss
+- Time Travel (soft/mixed/hard reset with safety confirmations)
 - Reflog browser for mistake recovery
 
-**AI Integration (P0 - Simplified)**:
+**GitHub Integration**:
+- OAuth device flow authentication
+- Repository creation and push
+- Collaborator management
+- Push/pull/sync operations
+
+**AI Integration**:
 - Repository state explanations
 - Git error translation
-- Commit message suggestions (metadata only, no file contents by default)
-- Basic operation recommendations
-
-### What is Simplified in MVP
-
-**AI Mentor**:
-- Limited to text-based explanations and suggestions
-- No automatic conflict resolution
-- No repository health analysis
-- No personalized learning paths
-
-**GitHub Integration**:
-- Basic repository creation and push only
-- Collaborator management deferred to Phase 2
-- No pull request or issue management
-
-**Performance**:
-- Optimized for repositories under 50,000 commits
-- Basic pagination without advanced caching
-- Simple virtual scrolling for lists
-
-**TUI Features**:
-- Standard terminal color support only
-- Basic keyboard navigation
-- Limited customization options
-
-### What is Postponed (Post-MVP)
-
-**Phase 2 (Months 4-6)**:
-- Advanced Git operations (interactive rebase, cherry-pick, stash management)
-- Enhanced GitHub integration (collaborators, pull requests)
-- Advanced performance optimizations for 100k+ commit repositories
-
-**Phase 3 (Months 7-9)**:
-- Full collaboration features (PR review, issue tracking)
-- Advanced AI features (automatic conflict resolution, health analysis)
-- Custom themes and layouts
-
-**Phase 4 (Year 2)**:
-- Enterprise features (GitLab/Bitbucket, SSO, audit logging)
-- Plugin system and extensibility
-- IDE integration
+- Commit message suggestions
+- Operation recommendations
+- Health check for backend connectivity
 
 ## Out of Scope
 
@@ -99,133 +60,9 @@ The following are explicitly NOT part of Zit's scope:
 - Guidance is contextual, not curriculum-based
 
 **Not a Code Review Tool**:
-- No inline code commenting (MVP)
+- No inline code commenting
 - No approval workflows
 - No review assignment systems
-
-## Feature Prioritization
-
-### P0 - Must Ship (MVP Blockers)
-
-## Feature Prioritization
-
-### P0 - Must Ship (MVP Blockers)
-
-These features are essential for a functional MVP:
-
-- **Requirement 1**: Repository Dashboard
-- **Requirement 2**: Smart Staging
-- **Requirement 3**: Guided Commits (without AI suggestions initially)
-- **Requirement 4**: Branch Management (basic operations only)
-- **Requirement 10**: Git Command Execution
-- **Requirement 11**: TUI State Management
-- **Requirement 12**: Error Handling & Recovery
-- **Requirement 15**: Keyboard-Driven Interface
-
-### P1 - Important (MVP Enhanced)
-
-These features significantly improve the MVP experience:
-
-- **Requirement 5**: Commit Timeline & Visual Graph
-- **Requirement 6**: Safe Time Travel (soft/mixed reset only, hard reset in P2)
-- **Requirement 7**: Reflog Recovery
-- **Requirement 8**: GitHub Integration (repository creation and push only)
-- **Requirement 9**: AI Mentor Guidance (basic explanations and error translation)
-- **Requirement 13**: Security & Privacy (PAT storage)
-
-### P2 - Good to Have (Post-MVP)
-
-These features enhance the product but can be delivered after MVP:
-
-- **Requirement 3**: AI-powered commit message suggestions
-- **Requirement 4**: Advanced branch operations (upstream management, auto-stash)
-- **Requirement 5**: Advanced timeline filtering and search
-- **Requirement 6**: Hard reset with full safety checks
-- **Requirement 8**: Collaborator management
-- **Requirement 9**: Advanced AI features (operation recommendations, alternatives)
-- **Requirement 14**: Performance optimizations for 100k+ commit repositories
-
-## Implementation Phasing
-
-### Phase 1: Core Workflows (Weeks 1-4)
-
-**Goal**: Enable basic daily Git operations through TUI
-
-**Deliverables**:
-- Git CLI execution framework
-- TUI foundation with ratatui
-- Repository dashboard
-- File staging and unstaging
-- Basic commit creation
-- Branch create/switch/delete
-- Keyboard navigation
-
-**Success Criteria**: Users can perform stage → commit → push workflow entirely in TUI
-
-### Phase 2: Safety & Recovery (Weeks 5-6)
-
-**Goal**: Add guardrails and mistake recovery
-
-**Deliverables**:
-- Confirmation dialogs for destructive operations
-- Warning system with severity levels
-- Reflog browser
-- Soft/mixed reset operations
-- File restore functionality
-
-**Success Criteria**: Users feel confident they won't lose work
-
-### Phase 3: Visual History (Weeks 7-8)
-
-**Goal**: Enable commit history exploration
-
-**Deliverables**:
-- Commit timeline with ASCII graph
-- Commit detail view with diffs
-- Basic filtering (message search)
-- Pagination for large histories
-
-**Success Criteria**: Users can navigate and understand repository history
-
-### Phase 4: GitHub Integration (Weeks 9-10)
-
-**Goal**: Enable basic GitHub workflows
-
-**Deliverables**:
-- PAT authentication and secure storage
-- Repository creation via GitHub API
-- Remote configuration
-- Push to GitHub
-- Error handling for API failures
-
-**Success Criteria**: Users can create and push to GitHub without leaving TUI
-
-### Phase 5: AI Integration (Weeks 11-12)
-
-**Goal**: Add AI-powered guidance layer
-
-**Deliverables**:
-- Lambda backend with Bedrock integration
-- Repository state explanations
-- Git error translation
-- Basic operation recommendations
-- Fallback handling for AI unavailability
-
-**Success Criteria**: Users receive helpful explanations for Git concepts and errors
-
-### Phase 6: Polish & Hardening (Weeks 13-14)
-
-**Goal**: Production readiness
-
-**Deliverables**:
-- Performance optimization
-- Error handling improvements
-- Help system and documentation
-- Cross-platform testing (Linux, macOS, Windows)
-- Security audit
-- Beta testing with target users
-
-**Success Criteria**: Product is stable, secure, and ready for public release
 
 ## Vision & Mission
 
@@ -284,11 +121,9 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 
 ## Requirements
 
-### Requirement 1: Repository Dashboard (P0)
+### Requirement 1: Repository Dashboard
 
 **User Story**: As a user, I want to see my repository's current state at a glance, so that I understand what's happening without running multiple commands.
-
-**MVP Scope**: Display essential repository state with basic formatting. Advanced styling and customization deferred to post-MVP.
 
 #### Acceptance Criteria
 
@@ -302,11 +137,9 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 8. WHEN the Repository has no upstream branch, THE System SHALL display "No upstream" instead of ahead/behind counts
 9. WHEN the System executes Git_CLI commands to gather dashboard data, THE System SHALL complete within 500ms for repositories with fewer than 10,000 commits
 
-### Requirement 2: Smart Staging (P0)
+### Requirement 2: Smart Staging
 
 **User Story**: As a user, I want to stage changes selectively with visual feedback, so that I can create focused commits without memorizing staging commands.
-
-**MVP Scope**: File-level and hunk-level staging with basic diff display. Syntax highlighting limited to common languages (Python, JavaScript, TypeScript, Rust, Go, Java).
 
 #### Acceptance Criteria
 
@@ -319,11 +152,9 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 7. WHEN a user unstages a file, THE System SHALL execute `git restore --staged <file>` via Git_CLI
 8. WHEN the System displays diffs, THE System SHALL use syntax highlighting for common file types
 
-### Requirement 3: Guided Commits (P0 core, P2 AI)
+### Requirement 3: Guided Commits
 
 **User Story**: As a user, I want to create well-formatted commits with guidance, so that my commit history is clear and professional.
-
-**MVP Scope**: Commit message editor with validation. AI suggestions are P2 enhancement.
 
 #### Acceptance Criteria
 
@@ -338,11 +169,9 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 9. WHEN a user confirms an amend, THE System SHALL execute `git commit --amend` via Git_CLI
 10. WHEN the System sends data to AI_Mentor, THE System SHALL NOT include file contents unless the user explicitly approves
 
-### Requirement 4: Branch Management (P0 core, P1 advanced)
+### Requirement 4: Branch Management
 
 **User Story**: As a user, I want to manage branches through visual workflows, so that I can organize my work without memorizing branch commands.
-
-**MVP Scope**: Basic branch operations (create, switch, delete). Upstream management and auto-stash are P1 enhancements.
 
 #### Acceptance Criteria
 
@@ -353,15 +182,13 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 5. WHEN a user confirms deletion of an unmerged branch, THE System SHALL execute `git branch -D <name>` via Git_CLI
 6. WHEN a user deletes a merged branch, THE System SHALL execute `git branch -d <name>` via Git_CLI
 7. WHEN a user renames a branch, THE System SHALL execute `git branch -m <old> <new>` via Git_CLI
-8. WHEN the System displays branch information, THE System SHALL show the upstream branch if configured (P1 - MVP enhanced)
-9. WHEN the System displays branch information, THE System SHALL show the ahead/behind commit count relative to upstream (P1 - MVP enhanced)
-10. WHEN a user switches branches with uncommitted changes, THE System SHALL warn and offer to stash changes (P1 - MVP enhanced)
+8. WHEN the System displays branch information, THE System SHALL show the upstream branch if configured
+9. WHEN the System displays branch information, THE System SHALL show the ahead/behind commit count relative to upstream
+10. WHEN a user switches branches with uncommitted changes, THE System SHALL warn and offer to stash changes
 
-### Requirement 5: Commit Timeline & Visual Graph (P1)
+### Requirement 5: Commit Timeline & Visual Graph
 
 **User Story**: As a user, I want to navigate my commit history visually, so that I can understand the repository's evolution and find specific changes.
-
-**MVP Scope**: Basic timeline with ASCII graph and commit details. Advanced filtering (time-based, author-based) is P2 enhancement.
 
 #### Acceptance Criteria
 
@@ -373,15 +200,13 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 6. WHEN the System displays the timeline, THE System SHALL highlight merge commits with distinct indicators
 7. WHEN a user selects a commit, THE System SHALL display full commit details including hash, author, date, and full message
 8. WHEN a user views commit details, THE System SHALL display the diff for that commit
-9. WHEN a user applies a message filter, THE System SHALL display only commits matching the search term (P1 - MVP enhanced)
-10. WHEN a user applies a time filter, THE System SHALL display only commits within the specified date range (P2 - Post-MVP enhancement)
+9. WHEN a user applies a message filter, THE System SHALL display only commits matching the search term
+10. WHEN a user applies a time filter, THE System SHALL display only commits within the specified date range
 11. WHEN the System renders the timeline, THE System SHALL paginate results to display 50 commits per page
 
-### Requirement 6: Safe Time Travel (P1 core, P2 hard reset)
+### Requirement 6: Safe Time Travel
 
 **User Story**: As a user, I want to navigate to previous states safely, so that I can fix mistakes or explore history without fear of data loss.
-
-**MVP Scope**: Branch creation from commits, soft/mixed reset, file restore. Hard reset with full safety checks is P2 enhancement.
 
 #### Acceptance Criteria
 
@@ -390,17 +215,15 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 3. WHEN a user confirms a soft reset, THE System SHALL execute `git reset --soft <commit>` via Git_CLI
 4. WHEN a user initiates a mixed reset, THE System SHALL display a warning explaining that HEAD will move and changes become unstaged
 5. WHEN a user confirms a mixed reset, THE System SHALL execute `git reset --mixed <commit>` via Git_CLI
-6. WHEN a user initiates a hard reset, THE System SHALL display a strong warning explaining that all uncommitted changes will be lost (P2 - Post-MVP enhancement)
-7. WHEN a user confirms a hard reset, THE System SHALL require typing "CONFIRM" before executing (P2 - Post-MVP enhancement)
-8. WHEN a user confirms a hard reset with verification, THE System SHALL execute `git reset --hard <commit>` via Git_CLI (P2 - Post-MVP enhancement)
+6. WHEN a user initiates a hard reset, THE System SHALL display a strong warning explaining that all uncommitted changes will be lost
+7. WHEN a user confirms a hard reset, THE System SHALL require typing "CONFIRM" before executing
+8. WHEN a user confirms a hard reset with verification, THE System SHALL execute `git reset --hard <commit>` via Git_CLI
 9. WHEN a user restores a file, THE System SHALL execute `git restore <file>` via Git_CLI
 10. WHEN a user restores a file from a specific commit, THE System SHALL execute `git restore --source=<commit> <file>` via Git_CLI
 
-### Requirement 7: Reflog Recovery (P1)
+### Requirement 7: Reflog Recovery
 
 **User Story**: As a user, I want to recover from mistakes using reflog, so that I can undo destructive operations and restore lost work.
-
-**MVP Scope**: Reflog browser with preview and recovery. Full integration with hard reset deferred to P2.
 
 #### Acceptance Criteria
 
@@ -412,11 +235,9 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 6. WHEN a user confirms recovery, THE System SHALL execute `git reset --hard <hash>` via Git_CLI
 7. WHEN the System displays the reflog, THE System SHALL paginate results to display 50 entries per page
 
-### Requirement 8: GitHub Integration (P1 core, P2 collaboration)
+### Requirement 8: GitHub Integration
 
 **User Story**: As a user, I want to manage GitHub repositories from the TUI, so that I can complete my workflow without switching to a browser.
-
-**MVP Scope**: Repository creation, authentication, and push. Collaborator management deferred to P2.
 
 #### Acceptance Criteria
 
@@ -425,33 +246,31 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 3. WHEN a user creates a repository, THE System SHALL allow setting visibility to public or private
 4. WHEN a repository is created successfully, THE System SHALL add it as a remote via `git remote add origin <url>`
 5. WHEN a user pushes to GitHub, THE System SHALL execute `git push -u origin <branch>` via Git_CLI
-6. WHEN a user adds a collaborator, THE System SHALL send a PUT request to GitHub_API `/repos/{owner}/{repo}/collaborators/{username}` (P2 - Post-MVP enhancement)
-7. WHEN a user lists collaborators, THE System SHALL send a GET request to GitHub_API `/repos/{owner}/{repo}/collaborators` (P2 - Post-MVP enhancement)
+6. WHEN a user adds a collaborator, THE System SHALL send a PUT request to GitHub_API `/repos/{owner}/{repo}/collaborators/{username}`
+7. WHEN a user lists collaborators, THE System SHALL send a GET request to GitHub_API `/repos/{owner}/{repo}/collaborators`
 8. WHEN GitHub_API returns an authentication error, THE System SHALL prompt the user to verify their PAT
 9. WHEN GitHub_API returns a rate limit error, THE System SHALL display the reset time and suggest waiting
 
-### Requirement 9: AI Mentor Guidance (P1 core, P2 advanced) — ✅ IMPLEMENTED
+### Requirement 9: AI Mentor Guidance
 
 **User Story**: As a user, I want AI-powered explanations and recommendations, so that I can learn Git concepts and make informed decisions.
 
-**Implementation Status**: All MVP and most P2 criteria are now implemented.
-
 #### Acceptance Criteria
 
-1. WHEN a user requests repository state explanation, THE System SHALL send repository metadata to Lambda_Backend — ✅ **IMPLEMENTED** (AI Mentor → Explain Repo)
-2. WHEN Lambda_Backend receives a request, THE Lambda_Backend SHALL invoke Bedrock with the user's query and context — ✅ **IMPLEMENTED** (Python 3.12 + Claude 3 Sonnet)
-3. WHEN Bedrock returns a response, THE Lambda_Backend SHALL return the explanation to the System — ✅ **IMPLEMENTED**
-4. WHEN a user requests commit explanation, THE System SHALL send commit metadata (hash, message, author, files changed) to Lambda_Backend — ✅ **IMPLEMENTED** (via explain with context)
-5. WHEN a user encounters a Git error, THE System SHALL send the error message to Lambda_Backend for translation — ✅ **IMPLEMENTED** (auto error explainer on git failures)
-6. WHEN AI_Mentor translates an error, THE System SHALL display the plain-English explanation and suggested next steps — ✅ **IMPLEMENTED** (popup dialog)
-7. WHEN a user initiates a Destructive_Operation, THE System SHALL request AI_Mentor to explain risks and alternatives — ✅ **IMPLEMENTED** (auto error explain on reset/branch delete failures)
-8. WHEN AI_Mentor suggests alternatives, THE System SHALL display them as actionable options — ✅ **IMPLEMENTED** (AI Mentor → Recommend)
-9. WHEN Lambda_Backend is unavailable, THE System SHALL display a fallback message and continue functioning without AI features — ✅ **IMPLEMENTED** (status bar message + menu shows config instructions)
-10. WHEN Lambda_Backend response time exceeds 3 seconds, THE System SHALL display a loading indicator — ✅ **IMPLEMENTED** ("⏳ Loading..." in AI Mentor title bar)
-11. WHEN the System sends data to Lambda_Backend, THE System SHALL NOT include file contents unless the user explicitly approves — ✅ **IMPLEMENTED** (only metadata + truncated diff stats)
-12. WHEN Bedrock returns a response, THE Lambda_Backend SHALL validate the response format before returning to the System — ✅ **IMPLEMENTED**
+1. WHEN a user requests repository state explanation, THE System SHALL send repository metadata to Lambda_Backend
+2. WHEN Lambda_Backend receives a request, THE Lambda_Backend SHALL invoke Bedrock with the user's query and context
+3. WHEN Bedrock returns a response, THE Lambda_Backend SHALL return the explanation to the System
+4. WHEN a user requests commit explanation, THE System SHALL send commit metadata (hash, message, author, files changed) to Lambda_Backend
+5. WHEN a user encounters a Git error, THE System SHALL send the error message to Lambda_Backend for translation
+6. WHEN AI_Mentor translates an error, THE System SHALL display the plain-English explanation and suggested next steps
+7. WHEN a user initiates a Destructive_Operation, THE System SHALL request AI_Mentor to explain risks and alternatives
+8. WHEN AI_Mentor suggests alternatives, THE System SHALL display them as actionable options
+9. WHEN Lambda_Backend is unavailable, THE System SHALL display a fallback message and continue functioning without AI features
+10. WHEN Lambda_Backend response time exceeds 3 seconds, THE System SHALL display a loading indicator
+11. WHEN the System sends data to Lambda_Backend, THE System SHALL NOT include file contents unless the user explicitly approves
+12. WHEN Bedrock returns a response, THE Lambda_Backend SHALL validate the response format before returning to the System
 
-#### Additional Implemented Features (beyond original requirements)
+#### Additional Features
 - **AI Mentor TUI panel** with 4 menu items (Explain Repo, Ask Question, Recommend, Health Check)
 - **Health check endpoint** (`GET /health`) to verify backend connectivity
 - **Non-blocking AI calls** via background threads + mpsc channels
@@ -460,13 +279,10 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 - **Diff truncation** at 4,000 chars
 - **Request body size limit** (128 KB)
 - **Environment variable fallback** for API credentials
-- **27 Lambda unit tests** + Lambda CI job in GitHub Actions
 
-### Requirement 10: Git Command Execution (P0)
+### Requirement 10: Git Command Execution
 
 **User Story**: As a system architect, I want all Git operations to use the real Git CLI, so that the system remains compatible and reliable.
-
-**MVP Scope**: Core Git CLI execution framework with error handling.
 
 #### Acceptance Criteria
 
@@ -478,11 +294,9 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 6. WHEN Git_CLI is not found, THE System SHALL display an error message and exit
 7. WHEN the System executes a Git command, THE System SHALL set the working directory to the repository root
 
-### Requirement 11: TUI State Management (P0)
+### Requirement 11: TUI State Management
 
 **User Story**: As a system architect, I want efficient TUI state management, so that the interface remains responsive and consistent.
-
-**MVP Scope**: Basic state management with component refresh. Advanced optimizations (virtual scrolling for 1000+ items) are P2 enhancements.
 
 #### Acceptance Criteria
 
@@ -491,29 +305,25 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 3. WHEN the System receives keyboard input, THE System SHALL process the input within 16ms (60 FPS)
 4. WHEN the System renders the TUI, THE System SHALL use double buffering to prevent flicker
 5. WHEN the terminal is resized, THE System SHALL reflow the layout within 100ms
-6. WHEN the System displays long lists, THE System SHALL implement virtual scrolling for lists exceeding 1000 items (P2 - Post-MVP enhancement)
+6. WHEN the System displays long lists, THE System SHALL implement virtual scrolling for lists exceeding 1000 items
 
-### Requirement 12: Error Handling & Recovery (P0)
+### Requirement 12: Error Handling & Recovery
 
 **User Story**: As a user, I want clear error messages and recovery options, so that I can resolve issues without external help.
-
-**MVP Scope**: Basic error display and suggestions. Advanced conflict resolution UI is P2 enhancement.
 
 #### Acceptance Criteria
 
 1. WHEN a Git command fails, THE System SHALL display the error message in plain English
 2. WHEN a Git command fails, THE System SHALL suggest possible solutions based on the error type
-3. WHEN the System encounters a merge conflict, THE System SHALL display conflicted files and offer to open a conflict resolution view (P2 - Post-MVP enhancement)
+3. WHEN the System encounters a merge conflict, THE System SHALL display conflicted files and offer to open a conflict resolution view
 4. WHEN the System encounters a network error, THE System SHALL display the error and suggest checking connectivity
 5. WHEN the System encounters a permission error, THE System SHALL display the error and suggest checking file permissions
 6. WHEN the System encounters an unexpected error, THE System SHALL log the error details and display a user-friendly message
 7. WHEN the System logs an error, THE System SHALL include timestamp, error type, and stack trace
 
-### Requirement 13: Security & Privacy (P1)
+### Requirement 13: Security & Privacy
 
 **User Story**: As a user, I want my credentials and code to remain secure, so that I can trust the system with sensitive repositories.
-
-**MVP Scope**: Secure PAT storage and HTTPS communication. Advanced privacy controls are P2 enhancements.
 
 #### Acceptance Criteria
 
@@ -526,28 +336,24 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 7. WHEN Lambda_Backend processes requests, THE Lambda_Backend SHALL NOT persist user data beyond the request lifecycle
 8. WHEN the System stores configuration, THE System SHALL use file permissions 600 (owner read/write only)
 
-### Requirement 14: Performance & Scalability (P2)
+### Requirement 14: Performance & Scalability
 
 **User Story**: As a user, I want the system to remain fast even in large repositories, so that my workflow isn't interrupted by slowness.
-
-**MVP Scope**: Optimized for repositories under 50,000 commits. Advanced optimizations for 100k+ commits are P2 enhancements.
 
 #### Acceptance Criteria
 
 1. WHEN the System starts in a repository with fewer than 10,000 commits, THE System SHALL display the dashboard within 500ms
-2. WHEN the System starts in a repository with 10,000 to 50,000 commits, THE System SHALL display the dashboard within 2 seconds (MVP target)
-3. WHEN the System starts in a repository with 50,000 to 100,000 commits, THE System SHALL display the dashboard within 5 seconds (P2 - Post-MVP optimization target)
-3. WHEN the System executes a Git command, THE System SHALL timeout after 30 seconds and display an error
-4. WHEN the System displays diffs, THE System SHALL limit diff output to 10,000 lines per file
-5. WHEN the System displays the commit timeline, THE System SHALL paginate results to avoid loading all commits into memory
-6. WHEN Lambda_Backend processes requests, THE Lambda_Backend SHALL respond within 5 seconds for 90% of requests (MVP target)
-7. WHEN Lambda_Backend experiences high load, THE Lambda_Backend SHALL scale to handle 50 concurrent requests (MVP target, 100+ in P2)
+2. WHEN the System starts in a repository with 10,000 to 50,000 commits, THE System SHALL display the dashboard within 2 seconds
+3. WHEN the System starts in a repository with 50,000 to 100,000 commits, THE System SHALL display the dashboard within 5 seconds
+4. WHEN the System executes a Git command, THE System SHALL timeout after 30 seconds and display an error
+5. WHEN the System displays diffs, THE System SHALL limit diff output to 10,000 lines per file
+6. WHEN the System displays the commit timeline, THE System SHALL paginate results to avoid loading all commits into memory
+7. WHEN Lambda_Backend processes requests, THE Lambda_Backend SHALL respond within 5 seconds for 90% of requests
+8. WHEN Lambda_Backend experiences high load, THE Lambda_Backend SHALL scale to handle 100+ concurrent requests
 
-### Requirement 15: Keyboard-Driven Interface (P0)
+### Requirement 15: Keyboard-Driven Interface
 
 **User Story**: As a user, I want to perform all operations via keyboard, so that I can maintain flow without reaching for a mouse.
-
-**MVP Scope**: Core keyboard navigation and shortcuts. Advanced customization deferred to P2.
 
 #### Acceptance Criteria
 
@@ -590,32 +396,32 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 
 ## Success Metrics & KPIs
 
-### Adoption Metrics (MVP Targets)
-- **Target**: 500 active users within 3 months of launch (early adopters and beta testers)
+### Adoption Metrics
+- **Target**: 500 active users within 3 months of launch
 - **Target**: 30% of users return weekly (weekly active users / monthly active users)
 - **Target**: Average session duration of 5+ minutes
 - **Target**: 100 GitHub stars within first month
 
-### Learning Metrics (Post-Launch Survey)
+### Learning Metrics
 - **Target**: 60% of beginner users report increased Git confidence
 - **Target**: 40% reduction in Git-related external searches among active users
 - **Target**: 70% of users successfully complete core workflows (stage → commit → push) within first week
 
-### Efficiency Metrics (MVP Baseline)
+### Efficiency Metrics
 - **Target**: 20% reduction in time to complete common Git workflows vs. CLI (measured via user timing studies)
 - **Target**: 90% of operations complete within 3 seconds
 - **Target**: AI response time under 5 seconds for 90% of requests
 
-### Safety Metrics (Critical for MVP)
+### Safety Metrics
 - **Target**: Zero data loss incidents reported by users
 - **Target**: 100% of destructive operations require explicit confirmation
 - **Target**: 80% of users report feeling "safe" using Git with Zit
 
-### Technical Metrics (MVP Infrastructure)
-- **Target**: 99% uptime for Lambda_Backend (allows for maintenance windows)
+### Technical Metrics
+- **Target**: 99% uptime for Lambda_Backend
 - **Target**: Lambda cold start time under 2 seconds
 - **Target**: Average Lambda execution time under 1 second
-- **Target**: Support for repositories up to 50,000 commits without performance degradation
+- **Target**: Support for repositories up to 100,000 commits without performance degradation
 
 ## Risks & Mitigations
 
@@ -680,97 +486,3 @@ Zit addresses these problems by providing visual workflows, safety guardrails, p
 - Encrypt PATs before storage
 - Support token expiration and rotation
 - Recommend using fine-grained PATs with minimal scopes
-
-## Roadmap Beyond MVP
-
-### Phase 2: Advanced Git Operations (Months 4-6)
-**Focus**: Power user features and advanced workflows
-
-- Hard reset with enhanced safety checks
-- Interactive rebase with visual conflict resolution
-- Cherry-pick with multi-commit selection
-- Stash management (apply/pop/drop/branch)
-- Submodule basic support
-- Worktree management
-
-**Success Criteria**: Power users can perform complex Git operations safely
-
-### Phase 3: Enhanced Collaboration (Months 7-9)
-**Focus**: GitHub integration depth and team workflows
-
-- Pull request creation and review from TUI
-- Issue tracking integration
-- Collaborator management
-- Code review comments
-- CI/CD status display
-- Team activity feed
-
-**Success Criteria**: Teams can collaborate entirely from TUI
-
-### Phase 4: AI Depth & Intelligence (Months 10-12)
-**Focus**: Advanced AI capabilities and learning
-
-- Commit message generation from diffs
-- Automatic conflict resolution suggestions
-- Repository health analysis and recommendations
-- Personalized learning paths based on usage patterns
-- Context-aware operation suggestions
-- Smart error recovery recommendations
-
-**Success Criteria**: AI becomes a trusted Git mentor for users
-
-### Phase 5: Enterprise & Scale (Year 2, Q1-Q2)
-**Focus**: Enterprise adoption and large-scale deployments
-
-- GitLab and Bitbucket integration
-- Team analytics and insights dashboard
-- Custom workflow templates
-- Audit logging and compliance
-- SSO integration (SAML, OAuth)
-- Performance optimization for 100k+ commit repositories
-
-**Success Criteria**: Enterprise teams adopt Zit as standard Git interface
-
-### Phase 6: Extensibility & Ecosystem (Year 2, Q3-Q4)
-**Focus**: Developer experience and customization
-
-- Plugin system for community extensions
-- Custom themes and color schemes
-- Scriptable automation and hooks
-- Integration with IDEs via LSP
-- Mobile companion app for notifications
-- API for third-party integrations
-
-**Success Criteria**: Active community building extensions and themes
-
-## Complexity Reduction Notes
-
-The following features have been simplified or deferred to maintain MVP feasibility:
-
-**AI Integration**:
-- MVP focuses on explanations and error translation only
-- Commit message generation deferred to Phase 4
-- Automatic conflict resolution deferred to Phase 4
-- Repository health analysis deferred to Phase 4
-
-**GitHub Integration**:
-- MVP includes only repository creation and push
-- Pull request and issue management deferred to Phase 3
-- Collaborator management deferred to Phase 3
-
-**Performance**:
-- MVP optimized for repositories under 50,000 commits
-- Advanced caching and optimization for 100k+ commits deferred to Phase 5
-- Virtual scrolling for 1000+ item lists deferred to P2
-
-**TUI Features**:
-- MVP uses standard terminal colors only
-- Custom themes and layouts deferred to Phase 6
-- Advanced customization deferred to Phase 6
-
-**Safety Features**:
-- Hard reset with full safety checks deferred to Phase 2
-- Advanced conflict resolution UI deferred to Phase 2
-- Automatic backup creation deferred to Phase 2
-
-These deferrals reduce MVP complexity by approximately 40% while maintaining core value proposition.

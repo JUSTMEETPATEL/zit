@@ -2,9 +2,10 @@
 
 > **zit** is an AI-powered, terminal-based Git and GitHub assistant built in Rust. It combines a rich TUI with intelligent AI mentorship to make Git accessible, safe, and educational.
 
-![License](https://img.shields.io/github/license/JUSTMEETPATEL/zit)
-![Rust](https://img.shields.io/badge/built_with-Rust-orange)
-![CI](https://img.shields.io/github/actions/workflow/status/JUSTMEETPATEL/zit/ci.yml?label=CI)
+[![License](https://img.shields.io/github/license/JUSTMEETPATEL/zit)](LICENSE)
+[![Rust](https://img.shields.io/badge/built_with-Rust-orange)](https://www.rust-lang.org/)
+[![CI](https://img.shields.io/github/actions/workflow/status/JUSTMEETPATEL/zit/ci.yml?label=CI)](https://github.com/JUSTMEETPATEL/zit/actions)
+[![Release](https://img.shields.io/github/v/release/JUSTMEETPATEL/zit)](https://github.com/JUSTMEETPATEL/zit/releases)
 
 ## Features
 
@@ -211,6 +212,10 @@ Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cp
 3. Check env vars: `echo $ZIT_AI_ENDPOINT $ZIT_AI_API_KEY`
 4. Check Lambda logs: `aws logs tail /aws/lambda/zit-ai-mentor-dev --region ap-south-1`
 
+## Contributing
+
+Contributions are welcome! Please read the [contributing guidelines](CONTRIBUTING.md) before submitting a pull request.
+
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

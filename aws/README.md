@@ -1,6 +1,6 @@
 # Zit AI Mentor — AWS Backend
 
-The AI backend for zit's AI Mentor feature. Runs on AWS Lambda with Amazon Bedrock (Claude 3 Sonnet).
+Production AI backend for zit's AI Mentor feature. Runs on AWS Lambda with Amazon Bedrock (Claude 3 Sonnet).
 
 ## Architecture
 

@@ -1450,7 +1450,7 @@ impl AppState {
 }
 ```
 
-**Virtual Scrolling** (P2 enhancement):
+**Virtual Scrolling**:
 ```rust
 pub struct VirtualList<T> {
     items: Vec<T>,
@@ -1503,7 +1503,7 @@ impl AICache {
 }
 ```
 
-**Git Output Cache** (P2 enhancement):
+**Git Output Cache**:
 ```rust
 pub struct GitCache {
     status_cache: Option<(Instant, Vec<FileStatus>)>,
@@ -1535,7 +1535,7 @@ impl GitCache {
 - Lazy loading on scroll
 - Acceptable performance (< 2s initial load)
 
-**Large Repositories** (50k+ commits) - P2 Enhancement:
+**Large Repositories** (50k+ commits):
 - Aggressive pagination (25 commits per page)
 - Virtual scrolling for all lists
 - Background loading with progress indicators
@@ -1545,12 +1545,11 @@ impl GitCache {
 ### Lambda Scaling
 
 **Concurrency**:
-- MVP: 50 concurrent executions
-- P2: 100 concurrent executions
+- 100 concurrent executions
 - Auto-scaling based on request rate
 
 **Cold Start Mitigation**:
-- Provisioned concurrency during peak hours (P2)
+- Provisioned concurrency during peak hours
 - Lightweight Lambda (< 50MB)
 - Minimal dependencies
 - Connection pooling for Bedrock
@@ -1866,7 +1865,7 @@ pub enum LogLevel {
 [2024-01-15T10:30:46Z] [ERROR] github_client: API request failed: 401 Unauthorized
 ```
 
-### Metrics Collection (P2 Enhancement)
+### Metrics Collection
 
 **Client-Side Metrics**:
 - Operation latencies (Git commands, API requests, AI queries)
@@ -1907,7 +1906,7 @@ cargo build --release --target x86_64-pc-windows-msvc
 
 **Distribution**:
 - **GitHub Releases**: Binary releases for Linux, macOS, Windows
-- **Package Managers** (P2):
+- **Package Managers**:
   - Homebrew (macOS/Linux): `brew install zit`
   - Cargo: `cargo install zit`
   - Scoop (Windows): `scoop install zit`
@@ -1962,8 +1961,8 @@ resource "aws_lambda_function_url" "zit_ai" {
 - Runtime: Python 3.11
 - Memory: 512MB (sufficient for Bedrock API calls)
 - Timeout: 30 seconds
-- Concurrency: 50 (MVP), 100 (P2)
-- Provisioned Concurrency: 0 (MVP), 5 (P2 during peak hours)
+- Concurrency: 100
+- Provisioned Concurrency: 5 during peak hours
 
 **IAM Permissions**:
 ```json
@@ -2069,7 +2068,7 @@ jobs:
 5. Update package manager formulas (Homebrew, Scoop)
 6. Deploy Lambda backend updates (if needed)
 
-### Monitoring and Alerting (P2)
+### Monitoring and Alerting
 
 **CloudWatch Alarms**:
 - Lambda error rate > 5%

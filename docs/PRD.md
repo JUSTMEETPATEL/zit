@@ -2,9 +2,7 @@
 
 **Version:** 1.0
 
-**Last Updated:** February 10, 2026
-
-**Status:** MVP Specification
+**Last Updated:** March 1, 2026
 
 ---
 
@@ -65,7 +63,7 @@ zit is not just a Git UI wrapper—it's a learning tool that:
 
 ---
 
-## Core Features (MVP)
+## Core Features
 
 ### 1. Repository Dashboard
 
@@ -146,7 +144,7 @@ zit is not just a Git UI wrapper—it's a learning tool that:
 * Show current branch with visual highlight
 * Create new branch from current HEAD or selected commit
 * Switch branches with confirmation if uncommitted changes exist
-* Delete branches (local only in MVP) with safety checks
+* Delete branches with safety checks
 * Rename current branch
 * Show branch metadata (last commit, author, date)
 * Track relationship to remote branches (upstream info)
@@ -607,65 +605,6 @@ User Input → crossterm → ratatui TUI → Git Commands (shell) → Parse Outp
 
 ---
 
-## Future Enhancements (Post-MVP)
-
-### Phase 2: Advanced Git Operations
-
-* Interactive rebase with visual conflict resolution
-* Cherry-pick commits across branches
-* Bisect workflow for bug hunting
-* Submodule management
-* Worktree support
-
-### Phase 3: Collaboration Features
-
-* Pull request creation and management
-* Code review workflows
-* Issue tracking integration
-* Team activity feed
-* Merge conflict resolution with AI suggestions
-
-### Phase 4: Learning & Onboarding
-
-* Interactive Git tutorial mode (in-TUI lessons)
-* Achievement system for learning milestones
-* Playground mode (safe sandbox for experimenting)
-* Export history as learning portfolio
-
-### Phase 5: Extensibility
-
-* Plugin system for custom commands
-* Theme customization
-* Custom AI prompts
-* Integration with other tools (Jira, Linear, Slack)
-
----
-
-## Open Questions
-
-1. **Licensing** : Should zit be open-source (MIT/Apache) or proprietary?
-
-* **Recommendation** : Open-source (MIT) to drive adoption and community contributions
-
-1. **Monetization** : How to sustain AI backend costs?
-
-* **Options** : Freemium (limited AI calls), sponsorware, enterprise licenses
-* **Recommendation** : Freemium with 100 AI calls/month free, then $5/month for unlimited
-
-1. **Installation** : Package via Homebrew, Cargo, or standalone binaries?
-
-* **Recommendation** : All three (Homebrew for macOS, Cargo for Rust users, binaries for everyone else)
-
-1. **Telemetry** : Should we collect anonymous usage data to improve the product?
-
-* **Recommendation** : Opt-in telemetry with transparent disclosure and easy opt-out
-
-1. **Windows Support** : Native Windows build or WSL-only?
-
-* **Recommendation** : WSL-only for MVP (simpler), native in Phase 2 if demand exists
-
----
-
 ## Appendix
 
 ### Glossary
@@ -692,7 +631,7 @@ User Input → crossterm → ratatui TUI → Git Commands (shell) → Parse Outp
 | **lazygit**        | TUI           | Fast, keyboard-driven                        | Lacks AI, steep learning curve         |
 | **GitHub Desktop** | GUI           | Polished, GitHub integration                 | Limited Git features, GUI-only         |
 | **Magit (Emacs)**  | Editor Plugin | Powerful, text-based                         | Requires Emacs, not standalone         |
-| **zit**            | AI TUI        | Learning-focused, AI mentor, terminal-native | New (no ecosystem yet)                 |
+| **zit**            | AI TUI        | Learning-focused, AI mentor, terminal-native | Growing community                      |
 
 ### User Personas
 
@@ -719,21 +658,3 @@ User Input → crossterm → ratatui TUI → Git Commands (shell) → Parse Outp
 * **Goal** : Increase productivity, reduce context switching
 * **Pain Point** : Tired of memorizing Git commands, wants speed
 * **zit Value** : Fast TUI workflows with AI for edge cases
-
----
-
-## Approval & Sign-Off
-
- **Product Manager** : [Name] - [Date]
-
- **Engineering Lead** : [Name] - [Date]
-
- **Design Lead** : [Name] - [Date]
-
- **Stakeholder** : [Name] - [Date]
-
----
-
- **Document History** :
-
-* v1.0 (Feb 10, 2026): Initial MVP specification
