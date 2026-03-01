@@ -32,7 +32,7 @@ impl BranchOps {
 
             let is_current = parts[0].trim() == "*";
             let name = parts[1].trim().to_string();
-            let is_remote = name.starts_with("remotes/") || name.contains('/');
+            let is_remote = name.starts_with("remotes/") || name.starts_with("origin/");
 
             branches.push(BranchEntry {
                 name,
