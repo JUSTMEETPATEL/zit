@@ -1,5 +1,7 @@
 pub mod ai_mentor;
+pub mod bisect;
 pub mod branches;
+pub mod cherry_pick;
 pub mod commit;
 pub mod dashboard;
 pub mod github;

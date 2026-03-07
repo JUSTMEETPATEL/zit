@@ -277,6 +277,12 @@ fn draw(f: &mut Frame, app: &mut App) {
         View::WorkflowBuilder => {
             ui::workflow_builder::render(f, area, &app.workflow_builder_state);
         }
+        View::Bisect => {
+            ui::bisect::render(f, area, &mut app.bisect_state);
+        }
+        View::CherryPick => {
+            ui::cherry_pick::render(f, area, &mut app.cherry_pick_state);
+        }
     }
 
     // Render popup overlay

@@ -85,6 +85,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &DashboardState, status_msg: &Op
             Constraint::Length(3), // Branch info
             Constraint::Length(3), // File counts
             Constraint::Min(5),    // Recent commits
+
             Constraint::Length(3), // Keybindings
             Constraint::Length(1), // Status bar
         ])
@@ -278,6 +279,10 @@ pub fn render(f: &mut Frame, area: Rect, state: &DashboardState, status_msg: &Op
         Span::raw(" Merge "),
         Span::styled("[w]", Style::default().fg(Color::Cyan)),
         Span::raw(" Workflow "),
+        Span::styled("[B]", Style::default().fg(Color::Cyan)),
+        Span::raw(" Bisect "),
+        Span::styled("[p]", Style::default().fg(Color::Magenta)),
+        Span::raw(" Cherry Pick "),
         Span::styled("[?]", Style::default().fg(Color::Cyan)),
         Span::raw(" Help "),
         Span::styled("[q]", Style::default().fg(Color::Red)),

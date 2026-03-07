@@ -6,8 +6,8 @@ use crate::ai::client::AiClient;
 use crate::config::Config;
 use crate::git;
 use crate::ui::{
-    ai_mentor, branches, commit, dashboard, github, merge_resolve, reflog, staging, stash,
-    time_travel, timeline, workflow_builder,
+    ai_mentor, bisect, branches, cherry_pick, commit, dashboard, github, merge_resolve, reflog,
+    staging, stash, time_travel, timeline, workflow_builder,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -24,6 +24,8 @@ pub enum View {
     Stash,
     MergeResolve,
     WorkflowBuilder,
+    Bisect,
+    CherryPick,
 }
 
 /// Popup dialog state.
@@ -156,6 +158,8 @@ pub struct App {
     pub stash_state: stash::StashState,
     pub merge_resolve_state: merge_resolve::MergeResolveState,
     pub workflow_builder_state: workflow_builder::WorkflowBuilderState,
+    pub bisect_state: bisect::BisectState,
+    pub cherry_pick_state: cherry_pick::CherryPickState,
 }
 
 impl App {
@@ -194,6 +198,8 @@ impl App {
             stash_state: stash::StashState::default(),
             merge_resolve_state: merge_resolve::MergeResolveState::default(),
             workflow_builder_state: workflow_builder::WorkflowBuilderState::new(),
+            bisect_state: bisect::BisectState::default(),
+            cherry_pick_state: cherry_pick::CherryPickState::default(),
         }
     }
 
@@ -212,6 +218,8 @@ impl App {
             View::Stash => self.stash_state.refresh(),
             View::MergeResolve => self.merge_resolve_state.refresh(),
             View::WorkflowBuilder => {} // no auto-refresh
+            View::Bisect => self.bisect_state.refresh(),
+            View::CherryPick => self.cherry_pick_state.refresh(),
         }
     }
 
@@ -415,6 +423,16 @@ impl App {
                     self.view = View::WorkflowBuilder;
                     return Ok(());
                 }
+                KeyCode::Char('B') => {
+                    self.view = View::Bisect;
+                    self.bisect_state.refresh();
+                    return Ok(());
+                }
+                KeyCode::Char('p') => {
+                    self.view = View::CherryPick;
+                    self.cherry_pick_state.refresh();
+                    return Ok(());
+                }
                 _ => {}
             }
         }
@@ -433,6 +451,8 @@ impl App {
             View::Stash => stash::handle_key(self, key)?,
             View::MergeResolve => merge_resolve::handle_key(self, key)?,
             View::WorkflowBuilder => workflow_builder::handle_key(self, key)?,
+            View::Bisect => bisect::handle_key(self, key)?,
+            View::CherryPick => cherry_pick::handle_key(self, key)?,
         }
 
         Ok(())
