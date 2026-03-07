@@ -343,30 +343,78 @@ pub fn get_merge_preview_diff(other_ref: &str) -> Result<String> {
 
 /// Check if a merge with another ref would have conflicts (dry run).
 /// Returns the list of conflicting file paths, or empty if clean merge.
+///
+/// Uses `git merge-tree` (git 2.38+) which operates on tree objects without
+/// touching the working tree — safe even if interrupted.
+/// Falls back to the old approach on older git versions.
 #[allow(dead_code)]
 pub fn check_merge_conflicts(other_ref: &str) -> Result<Vec<String>> {
-    // Use git merge-tree (available since git 2.38) for conflict checking without modifying worktree
-    // Fallback: try merge with --no-commit --no-ff then abort
-    let result = run_git(&["merge", "--no-commit", "--no-ff", other_ref]);
+    // Try git merge-tree first (safe: no worktree modification)
+    let merge_tree_result = run_git(&["merge-tree", "--write-tree", "--no-messages", "HEAD", other_ref]);
 
+    match merge_tree_result {
+        Ok(output) => {
+            // Exit code 0 = clean merge, exit code non-zero with output = conflicts
+            // If merge-tree succeeds with just a tree hash, it's a clean merge
+            if output.trim().len() == 40 || output.trim().len() == 64 {
+                // Clean merge — just a tree hash, no conflicts
+                return Ok(Vec::new());
+            }
+            // Parse conflict file paths from merge-tree output
+            let conflicts: Vec<String> = output
+                .lines()
+                .filter(|line| {
+                    // merge-tree outputs conflict info lines
+                    line.contains("CONFLICT") || line.starts_with("Auto-merging")
+                })
+                .filter_map(|line| {
+                    // Extract file path from lines like "CONFLICT (content): Merge conflict in file.rs"
+                    line.rsplit(" in ").next().map(|s| s.trim().to_string())
+                })
+                .collect();
+            Ok(conflicts)
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            // merge-tree on older git or with conflicts reports via stderr
+            if err_str.contains("CONFLICT") || err_str.contains("Automatic merge failed") {
+                let conflicts: Vec<String> = err_str
+                    .lines()
+                    .filter(|line| line.contains("CONFLICT"))
+                    .filter_map(|line| {
+                        line.rsplit(" in ").next().map(|s| s.trim().to_string())
+                    })
+                    .collect();
+                Ok(conflicts)
+            } else if err_str.contains("not a git command") || err_str.contains("merge-tree") {
+                // Fallback for git < 2.38: use merge --no-commit --no-ff
+                log::warn!("git merge-tree not available, falling back to merge --no-commit");
+                check_merge_conflicts_legacy(other_ref)
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+/// Legacy fallback for git < 2.38: check conflicts by doing a real merge then aborting.
+/// This modifies the worktree temporarily and is NOT safe if interrupted.
+fn check_merge_conflicts_legacy(other_ref: &str) -> Result<Vec<String>> {
+    let result = run_git(&["merge", "--no-commit", "--no-ff", other_ref]);
     match result {
         Ok(_) => {
-            // Clean merge — abort it
             let _ = run_git(&["merge", "--abort"]);
             Ok(Vec::new())
         }
         Err(e) => {
             let err_str = e.to_string();
             if err_str.contains("CONFLICT") || err_str.contains("Automatic merge failed") {
-                // Get list of conflicted files
                 let status = super::status::get_status().unwrap_or_default();
                 let conflicts: Vec<String> =
                     status.conflicts.iter().map(|f| f.path.clone()).collect();
-                // Abort the test merge
                 let _ = run_git(&["merge", "--abort"]);
                 Ok(conflicts)
             } else {
-                // Abort if merge started
                 let _ = run_git(&["merge", "--abort"]);
                 Err(e)
             }

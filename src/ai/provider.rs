@@ -45,40 +45,62 @@ pub fn create_provider(config: &AiConfig) -> Option<Box<dyn AiProvider>> {
             if api_key.is_empty() {
                 return None;
             }
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(timeout))
+                .build()
+                .ok()?;
             Some(Box::new(BedrockProvider {
                 endpoint,
                 api_key,
                 timeout,
+                client,
             }))
         }
         "openai" | "openrouter" => {
             if api_key.is_empty() {
                 return None;
             }
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(timeout))
+                .build()
+                .ok()?;
             Some(Box::new(OpenAiCompatibleProvider {
                 endpoint,
                 api_key,
                 model,
                 timeout,
                 provider_name: provider.to_string(),
+                client,
             }))
         }
         "anthropic" => {
             if api_key.is_empty() {
                 return None;
             }
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(timeout))
+                .build()
+                .ok()?;
             Some(Box::new(AnthropicProvider {
                 endpoint,
                 api_key,
                 model,
                 timeout,
+                client,
             }))
         }
-        "ollama" => Some(Box::new(OllamaProvider {
-            endpoint,
-            model,
-            timeout,
-        })),
+        "ollama" => {
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(timeout))
+                .build()
+                .ok()?;
+            Some(Box::new(OllamaProvider {
+                endpoint,
+                model,
+                timeout,
+                client,
+            }))
+        }
         _ => None,
     }
 }
@@ -91,6 +113,7 @@ pub struct BedrockProvider {
     pub endpoint: String,
     pub api_key: String,
     pub timeout: u64,
+    client: reqwest::blocking::Client,
 }
 
 /// Bedrock-specific request that mirrors the Lambda's expected input.
@@ -132,11 +155,7 @@ impl AiProvider for BedrockProvider {
             error: None,
         };
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(self.timeout))
-            .build()?;
-
-        let resp = client
+        let resp = self.client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -162,12 +181,8 @@ impl AiProvider for BedrockProvider {
     }
 
     fn health_check(&self) -> Result<String> {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()?;
-
         let url = self.endpoint.replace("/mentor", "/health");
-        let resp = client
+        let resp = self.client
             .get(&url)
             .header("x-api-key", &self.api_key)
             .send()
@@ -190,11 +205,7 @@ impl BedrockProvider {
     /// Send a raw `MentorRequest`-shaped JSON body to the Lambda endpoint.
     /// This is the primary path for Bedrock — keeps full compatibility.
     pub fn call_raw(&self, body: &serde_json::Value) -> Result<String> {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(self.timeout))
-            .build()?;
-
-        let resp = client
+        let resp = self.client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -228,6 +239,7 @@ pub struct OpenAiCompatibleProvider {
     pub model: String,
     pub timeout: u64,
     pub provider_name: String,
+    client: reqwest::blocking::Client,
 }
 
 #[derive(Serialize)]
@@ -287,11 +299,7 @@ impl AiProvider for OpenAiCompatibleProvider {
             temperature: 0.7,
         };
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(self.timeout))
-            .build()?;
-
-        let mut builder = client
+        let mut builder = self.client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.api_key));
@@ -356,6 +364,7 @@ pub struct AnthropicProvider {
     pub api_key: String,
     pub model: String,
     pub timeout: u64,
+    client: reqwest::blocking::Client,
 }
 
 #[derive(Serialize)]
@@ -400,11 +409,7 @@ impl AiProvider for AnthropicProvider {
             }],
         };
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(self.timeout))
-            .build()?;
-
-        let resp = client
+        let resp = self.client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -457,6 +462,7 @@ pub struct OllamaProvider {
     pub endpoint: String,
     pub model: String,
     pub timeout: u64,
+    client: reqwest::blocking::Client,
 }
 
 #[derive(Serialize)]
@@ -502,11 +508,7 @@ impl AiProvider for OllamaProvider {
 
         let url = format!("{}/api/chat", self.endpoint.trim_end_matches('/'));
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(self.timeout))
-            .build()?;
-
-        let resp = client
+        let resp = self.client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&req)
@@ -535,11 +537,8 @@ impl AiProvider for OllamaProvider {
 
     fn health_check(&self) -> Result<String> {
         let url = format!("{}/api/tags", self.endpoint.trim_end_matches('/'));
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()?;
 
-        let resp = client
+        let resp = self.client
             .get(&url)
             .send()
             .context("Cannot reach Ollama — is it running? (ollama serve)")?;

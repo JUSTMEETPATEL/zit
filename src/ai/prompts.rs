@@ -4,6 +4,7 @@
 //! The Bedrock provider sends raw requests to Lambda, which has its own copy.
 
 use crate::ai::client::RepoContext;
+use super::DIFF_TRUNCATE_AT;
 
 // ─── System Prompts ────────────────────────────────────────────
 
@@ -241,7 +242,7 @@ pub fn format_context(ctx: &RepoContext) -> String {
         ));
     }
     if let Some(ref cd) = ctx.conflict_diff {
-        let trimmed: String = cd.chars().take(4000).collect();
+        let trimmed: String = cd.chars().take(DIFF_TRUNCATE_AT).collect();
         lines.push(format!("Conflict Content:\n{}", trimmed));
     }
     if let Some(ref mt) = ctx.merge_type {
@@ -251,7 +252,7 @@ pub fn format_context(ctx: &RepoContext) -> String {
         lines.push("⚠️ DETACHED HEAD STATE".to_string());
     }
     if let Some(ref d) = ctx.diff {
-        let trimmed: String = d.chars().take(4000).collect();
+        let trimmed: String = d.chars().take(DIFF_TRUNCATE_AT).collect();
         lines.push(format!("Diff:\n{}", trimmed));
     }
 
@@ -286,7 +287,7 @@ pub fn build_user_message(
                 ctx.staged_files.join(", ")
             };
             let diff_preview = ctx.diff.as_ref().map(|d| {
-                let trimmed: String = d.chars().take(4000).collect();
+                let trimmed: String = d.chars().take(DIFF_TRUNCATE_AT).collect();
                 format!("Diff Preview: {}...", trimmed)
             }).unwrap_or_default();
 
@@ -309,7 +310,7 @@ pub fn build_user_message(
         }
         "review" => {
             let diff = ctx.diff.as_deref().unwrap_or("No diff provided");
-            let trimmed: String = diff.chars().take(4000).collect();
+            let trimmed: String = diff.chars().take(DIFF_TRUNCATE_AT).collect();
             let staged = if ctx.staged_files.is_empty() {
                 "Unknown".to_string()
             } else {
@@ -324,7 +325,7 @@ pub fn build_user_message(
         }
         "merge_resolve" => {
             let conflict_diff = ctx.conflict_diff.as_deref().unwrap_or("No conflict content provided");
-            let trimmed: String = conflict_diff.chars().take(4000).collect();
+            let trimmed: String = conflict_diff.chars().take(DIFF_TRUNCATE_AT).collect();
             let conflict_files = if ctx.conflict_files.is_empty() {
                 "Unknown".to_string()
             } else {

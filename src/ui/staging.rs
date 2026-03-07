@@ -441,6 +441,9 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
                 KeyCode::Char('c') => {
                     // handled below after borrow is released
                 }
+                KeyCode::Char('d') => {
+                    // handled below after borrow is released (discard changes)
+                }
                 KeyCode::PageDown => {
                     state.diff_scroll = state.diff_scroll.saturating_add(10);
                 }
@@ -467,6 +470,22 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
             app.view = crate::app::View::Commit;
             app.commit_state.refresh();
             app.auto_suggest_if_ready();
+        }
+        KeyCode::Char('d') => {
+            // Discard changes for the selected unstaged file
+            if let Some(file) = app.staging_state.files.get(app.staging_state.selected) {
+                if !file.is_staged {
+                    let path = file.path.clone();
+                    app.popup = crate::app::Popup::Confirm {
+                        title: "Discard Changes".to_string(),
+                        message: format!(
+                            "Discard all changes to '{}'? This cannot be undone.",
+                            path
+                        ),
+                        on_confirm: crate::app::ConfirmAction::DiscardFile(path),
+                    };
+                }
+            }
         }
         _ => {}
     }

@@ -99,9 +99,23 @@ impl AiMentorState {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            // Simple HH:MM format from epoch seconds
-            let hours = (secs / 3600) % 24;
-            let mins = (secs / 60) % 60;
+            // Get local time offset and compute local HH:MM
+            // Use libc on unix to get timezone offset, fall back to UTC
+            #[cfg(unix)]
+            let offset_secs: i64 = {
+                // Safe: we're single-threaded at this point
+                unsafe {
+                    let mut tm: libc::tm = std::mem::zeroed();
+                    let time = secs as libc::time_t;
+                    libc::localtime_r(&time, &mut tm);
+                    tm.tm_gmtoff
+                }
+            };
+            #[cfg(not(unix))]
+            let offset_secs: i64 = 0; // Windows falls back to UTC
+            let local_secs = (secs as i64 + offset_secs) as u64;
+            let hours = (local_secs / 3600) % 24;
+            let mins = (local_secs / 60) % 60;
             format!("{:02}:{:02}", hours, mins)
         };
         self.history.push(AiHistoryEntry {

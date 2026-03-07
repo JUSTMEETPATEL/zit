@@ -142,7 +142,7 @@ def lambda_handler(event, context):
         
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}", exc_info=True)
-        return build_response(500, False, error=str(e))
+        return build_response(500, False, error="Internal server error. Please try again later.")
 
 
 def invoke_bedrock(system_prompt: str, user_message: str) -> str:

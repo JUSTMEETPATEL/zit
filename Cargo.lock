@@ -2602,6 +2602,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "keyring",
+ "libc",
  "log",
  "pretty_assertions",
  "ratatui",

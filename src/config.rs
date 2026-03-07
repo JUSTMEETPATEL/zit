@@ -265,12 +265,13 @@ impl AiConfig {
 
         // Check API key (required for all except ollama)
         if provider != "ollama" {
-            if self.resolved_api_key().is_none() {
+            let resolved_key = self.resolved_api_key();
+            if resolved_key.is_none() {
                 issues.push(format!(
                     "API key required for '{}' — add 'api_key' to [ai] config or set ZIT_AI_API_KEY",
                     provider
                 ));
-            } else if let Some(ref key) = self.resolved_api_key() {
+            } else if let Some(ref key) = resolved_key {
                 if key.len() < 8 {
                     issues.push("AI API key seems too short (< 8 chars)".to_string());
                 }

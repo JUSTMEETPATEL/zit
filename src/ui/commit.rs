@@ -196,11 +196,37 @@ pub fn render(
     // Show cursor position if editing
     if state.editing {
         let msg_lines: Vec<&str> = state.message.lines().collect();
-        let cursor_y = msg_lines.len().max(1) - 1;
-        let cursor_x = msg_lines.last().map(|l| l.len()).unwrap_or(0);
+        let last_line = msg_lines.last().copied().unwrap_or("");
+        let editor_inner_width = chunks[2].width.saturating_sub(2) as usize; // minus borders
+
+        // Account for line wrapping: count how many visual lines come before the cursor
+        let mut visual_y: u16 = 0;
+        for (i, line) in msg_lines.iter().enumerate() {
+            if i == msg_lines.len() - 1 {
+                break; // Don't count the current line
+            }
+            // Each line takes ceil(len / width) visual lines, minimum 1
+            let line_len = line.len().max(1);
+            if editor_inner_width > 0 {
+                visual_y += ((line_len + editor_inner_width - 1) / editor_inner_width) as u16;
+            } else {
+                visual_y += 1;
+            }
+        }
+
+        // Cursor position within the last line, accounting for wrapping
+        let cursor_x = if editor_inner_width > 0 {
+            last_line.len() % editor_inner_width
+        } else {
+            last_line.len()
+        };
+        if editor_inner_width > 0 {
+            visual_y += (last_line.len() / editor_inner_width) as u16;
+        }
+
         f.set_cursor_position((
             chunks[2].x + 1 + cursor_x as u16,
-            chunks[2].y + 1 + cursor_y as u16,
+            chunks[2].y + 1 + visual_y,
         ));
     }
 

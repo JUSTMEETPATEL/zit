@@ -307,6 +307,18 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
                 };
             }
         }
+        KeyCode::Char('f') => {
+            // Restore a specific file from the selected commit
+            if let Some(commit) = state.commits.get(state.selected) {
+                let hash = commit.short_hash.clone();
+                app.popup = crate::app::Popup::Input {
+                    title: format!("Restore File from {}", hash),
+                    prompt: "File path to restore: ".to_string(),
+                    value: String::new(),
+                    on_submit: crate::app::InputAction::SearchFiles,
+                };
+            }
+        }
         _ => {}
     }
 

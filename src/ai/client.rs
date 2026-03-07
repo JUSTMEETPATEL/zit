@@ -17,8 +17,8 @@ use crate::git;
 /// Maximum number of retry attempts for transient failures.
 const MAX_RETRIES: u32 = 2;
 
-/// Maximum diff content included in context (chars). Truncated beyond this.
-const DIFF_TRUNCATE_AT: usize = 4000;
+/// Re-export from parent module for local use.
+use super::DIFF_TRUNCATE_AT;
 
 /// Cache TTL — responses are cached for 5 minutes.
 const CACHE_TTL: Duration = Duration::from_secs(300);

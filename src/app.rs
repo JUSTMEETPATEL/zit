@@ -93,6 +93,7 @@ pub enum ConfirmAction {
     ContinueMerge,
     MergePullRequest { number: u64, method: String },
     ClosePullRequest(u64),
+    DiscardFile(String),
 }
 
 #[derive(Debug, Clone)]
@@ -576,6 +577,28 @@ impl App {
                             *r = Some(github::PrBgResult::CloseResult(result));
                         }
                     });
+                }
+            }
+            ConfirmAction::DiscardFile(path) => {
+                match git::run_git(&["restore", &path]) {
+                    Ok(_) => {
+                        self.set_status(&format!("Discarded changes to '{}'", path));
+                        self.staging_state.refresh();
+                    }
+                    Err(e) => {
+                        // Try checkout fallback for older git
+                        match git::run_git(&["checkout", "--", &path]) {
+                            Ok(_) => {
+                                self.set_status(&format!("Discarded changes to '{}'", path));
+                                self.staging_state.refresh();
+                            }
+                            Err(_) => {
+                                let err_str = e.to_string();
+                                self.set_status(&format!("Failed to discard: {}", err_str));
+                                self.start_ai_error_explain(err_str);
+                            }
+                        }
+                    }
                 }
             }
         }

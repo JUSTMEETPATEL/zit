@@ -97,20 +97,12 @@ pub fn render(f: &mut Frame, area: Rect, state: &mut StashState) {
 
     f.render_stateful_widget(list, chunks[0], &mut state.list_state);
 
-    // Diff preview
+    // Diff preview — use structured diff coloring
     let diff_lines: Vec<Line> = state
         .diff_text
         .lines()
         .map(|line| {
-            let color = if line.starts_with('+') {
-                Color::Green
-            } else if line.starts_with('-') {
-                Color::Red
-            } else if line.starts_with("@@") {
-                Color::Cyan
-            } else {
-                Color::DarkGray
-            };
+            let color = crate::ui::utils::diff_line_color(line);
             Line::from(Span::styled(line, Style::default().fg(color)))
         })
         .collect();

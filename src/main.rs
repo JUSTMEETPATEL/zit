@@ -125,6 +125,18 @@ fn main() -> Result<()> {
 
     let tick_rate = config.general.tick_rate_ms;
 
+    // Install panic hook that restores the terminal before printing the panic
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let _ = disable_raw_mode();
+        let _ = execute!(
+            io::stdout(),
+            LeaveAlternateScreen,
+            crossterm::event::DisableMouseCapture
+        );
+        original_hook(panic_info);
+    }));
+
     // Setup terminal
     enable_raw_mode().context("Failed to enable raw mode")?;
     let mut stdout = io::stdout();
@@ -152,6 +164,9 @@ fn main() -> Result<()> {
         crossterm::event::DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+
+    // Remove panic hook since terminal is restored
+    let _ = std::panic::take_hook();
 
     if let Err(err) = res {
         eprintln!("Error: {}", err);
@@ -231,8 +246,8 @@ fn draw(f: &mut Frame, app: &mut App) {
             ui::reflog::render(f, area, &mut app.reflog_state);
         }
         View::GitHub => {
-            let config = app.config.clone();
-            ui::github::render(f, area, &mut app.github_state, &config);
+            let config = &app.config;
+            ui::github::render(f, area, &mut app.github_state, config);
         }
         View::AiMentor => {
             let ai_available = app.ai_client.is_some();
