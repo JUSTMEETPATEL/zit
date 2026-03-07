@@ -582,19 +582,19 @@ impl App {
             ConfirmAction::DiscardFile(path) => {
                 match git::run_git(&["restore", &path]) {
                     Ok(_) => {
-                        self.set_status(&format!("Discarded changes to '{}'", path));
+                        self.set_status(format!("Discarded changes to '{}'", path));
                         self.staging_state.refresh();
                     }
                     Err(e) => {
                         // Try checkout fallback for older git
                         match git::run_git(&["checkout", "--", &path]) {
                             Ok(_) => {
-                                self.set_status(&format!("Discarded changes to '{}'", path));
+                                self.set_status(format!("Discarded changes to '{}'", path));
                                 self.staging_state.refresh();
                             }
                             Err(_) => {
                                 let err_str = e.to_string();
-                                self.set_status(&format!("Failed to discard: {}", err_str));
+                                self.set_status(format!("Failed to discard: {}", err_str));
                                 self.start_ai_error_explain(err_str);
                             }
                         }
@@ -611,10 +611,10 @@ impl App {
             && !matches!(
                 action,
                 InputAction::AiSetupProvider
-                | InputAction::AiSetupModel
-                | InputAction::AiSetupEndpoint
-                | InputAction::AiSetupApiKey
-                | InputAction::StashPush
+                    | InputAction::AiSetupModel
+                    | InputAction::AiSetupEndpoint
+                    | InputAction::AiSetupApiKey
+                    | InputAction::StashPush
             )
         {
             return Ok(());
@@ -716,7 +716,12 @@ impl App {
                         self.popup = Popup::Input {
                             title: "🤖 AI Setup — OpenRouter (2/3)".to_string(),
                             prompt: "Model (e.g. anthropic/claude-sonnet-4): ".to_string(),
-                            value: self.config.ai.model.clone().unwrap_or_else(|| "anthropic/claude-sonnet-4".to_string()),
+                            value: self
+                                .config
+                                .ai
+                                .model
+                                .clone()
+                                .unwrap_or_else(|| "anthropic/claude-sonnet-4".to_string()),
                             on_submit: InputAction::AiSetupModel,
                         };
                     }
@@ -748,7 +753,10 @@ impl App {
             }
             InputAction::AiSetupEndpoint => {
                 let endpoint = value.trim().to_string();
-                let provider = self.ai_setup_provider.clone().unwrap_or("bedrock".to_string());
+                let provider = self
+                    .ai_setup_provider
+                    .clone()
+                    .unwrap_or("bedrock".to_string());
 
                 if provider == "bedrock" && endpoint.is_empty() {
                     self.set_status("AI setup cancelled — Bedrock requires an endpoint");
@@ -1366,14 +1374,24 @@ impl App {
                         }
                         Some(AiAction::MergeResolve(file_path)) => {
                             // Parse AI response and populate merge resolve state
-                            log::debug!("[MergeResolve] AI response received for {}, len={}", file_path, response.len());
+                            log::debug!(
+                                "[MergeResolve] AI response received for {}, len={}",
+                                file_path,
+                                response.len()
+                            );
                             self.merge_resolve_state.ai_suggestion = Some(response.clone());
                             self.merge_resolve_state.ai_resolved_content =
                                 parse_ai_resolved_content(&response);
                             self.merge_resolve_state.ai_recommendation =
                                 parse_ai_recommendation(&response);
-                            log::debug!("[MergeResolve] ai_suggestion set: {}", self.merge_resolve_state.ai_suggestion.is_some());
-                            log::debug!("[MergeResolve] ai_resolved_content set: {}", self.merge_resolve_state.ai_resolved_content.is_some());
+                            log::debug!(
+                                "[MergeResolve] ai_suggestion set: {}",
+                                self.merge_resolve_state.ai_suggestion.is_some()
+                            );
+                            log::debug!(
+                                "[MergeResolve] ai_resolved_content set: {}",
+                                self.merge_resolve_state.ai_resolved_content.is_some()
+                            );
                             self.set_status(format!("✓ AI resolution ready for {}", file_path));
                             // Generate follow-up suggestions
                             let follow_ups =
@@ -1463,7 +1481,11 @@ impl App {
                     }
                 }
                 Ok(Err(e)) => {
-                    log::debug!("[AI] poll_ai_result: ERROR action={:?} err={}", self.ai_action, e);
+                    log::debug!(
+                        "[AI] poll_ai_result: ERROR action={:?} err={}",
+                        self.ai_action,
+                        e
+                    );
                     self.set_status(format!("AI error: {}", e));
                     self.ai_loading = false;
                     self.ai_receiver = None;
@@ -1473,7 +1495,10 @@ impl App {
                     // Still waiting — nothing to do
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
-                    log::debug!("[AI] poll_ai_result: DISCONNECTED action={:?}", self.ai_action);
+                    log::debug!(
+                        "[AI] poll_ai_result: DISCONNECTED action={:?}",
+                        self.ai_action
+                    );
                     self.set_status("AI request was interrupted");
                     self.ai_loading = false;
                     self.ai_receiver = None;

@@ -13,9 +13,9 @@ use ratatui::{
 pub struct WorkflowNode {
     pub id: usize,
     pub name: String,
-    pub uses: Option<String>,  // e.g. "actions/checkout@v4"
-    pub run: Option<String>,   // e.g. "npm install"
-    pub needs: Vec<usize>,     // IDs of dependency nodes
+    pub uses: Option<String>, // e.g. "actions/checkout@v4"
+    pub run: Option<String>,  // e.g. "npm install"
+    pub needs: Vec<usize>,    // IDs of dependency nodes
 }
 
 impl WorkflowNode {
@@ -214,8 +214,8 @@ pub fn render(f: &mut Frame, area: Rect, state: &WorkflowBuilderState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Title
-            Constraint::Length(3),  // Workflow info
+            Constraint::Length(3), // Title
+            Constraint::Length(3), // Workflow info
             Constraint::Min(10),   // Pipeline view
             Constraint::Length(3), // Keys
             Constraint::Length(2), // Status
@@ -272,25 +272,25 @@ pub fn render(f: &mut Frame, area: Rect, state: &WorkflowBuilderState) {
 
     // Keys based on mode
     let keys = match state.mode {
-        BuilderMode::Navigate => {
-            Line::from(vec![
-                Span::styled(" [a]", Style::default().fg(Color::Green)),
-                Span::raw(" Add "),
-                Span::styled("[Enter]", Style::default().fg(Color::Cyan)),
-                Span::raw(" Edit "),
-                Span::styled("[d]", Style::default().fg(Color::Red)),
-                Span::raw(" Delete "),
-                Span::styled("[c]", Style::default().fg(Color::Yellow)),
-                Span::raw(" Connect "),
-                Span::styled("[g]", Style::default().fg(Color::Magenta)),
-                Span::raw(" Generate "),
-                Span::styled("[n]", Style::default().fg(Color::White)),
-                Span::raw(" Name "),
-                Span::styled("[t]", Style::default().fg(Color::White)),
-                Span::raw(" Triggers"),
-            ])
-        }
-        BuilderMode::EditName | BuilderMode::EditUses | BuilderMode::EditRun
+        BuilderMode::Navigate => Line::from(vec![
+            Span::styled(" [a]", Style::default().fg(Color::Green)),
+            Span::raw(" Add "),
+            Span::styled("[Enter]", Style::default().fg(Color::Cyan)),
+            Span::raw(" Edit "),
+            Span::styled("[d]", Style::default().fg(Color::Red)),
+            Span::raw(" Delete "),
+            Span::styled("[c]", Style::default().fg(Color::Yellow)),
+            Span::raw(" Connect "),
+            Span::styled("[g]", Style::default().fg(Color::Magenta)),
+            Span::raw(" Generate "),
+            Span::styled("[n]", Style::default().fg(Color::White)),
+            Span::raw(" Name "),
+            Span::styled("[t]", Style::default().fg(Color::White)),
+            Span::raw(" Triggers"),
+        ]),
+        BuilderMode::EditName
+        | BuilderMode::EditUses
+        | BuilderMode::EditRun
         | BuilderMode::EditWorkflowName => {
             let field = match state.mode {
                 BuilderMode::EditName => "Step Name",
@@ -344,16 +344,15 @@ pub fn render(f: &mut Frame, area: Rect, state: &WorkflowBuilderState) {
                 .flat_map(|(i, &t)| {
                     let active = state.trigger_events.contains(&t.to_string());
                     let style = if active {
-                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::DarkGray)
                     };
                     let marker = if active { "✓" } else { "○" };
                     vec![
-                        Span::styled(
-                            format!(" [{}]", i + 1),
-                            Style::default().fg(Color::Cyan),
-                        ),
+                        Span::styled(format!(" [{}]", i + 1), Style::default().fg(Color::Cyan)),
                         Span::styled(format!(" {} {} ", marker, t), style),
                     ]
                 })
@@ -492,9 +491,7 @@ fn render_pipeline(f: &mut Frame, area: Rect, state: &WorkflowBuilderState) {
             mid_spans.push(Span::styled("│", Style::default().fg(border_color)));
             mid_spans.push(Span::styled(
                 name_padded,
-                Style::default()
-                    .fg(name_color)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(name_color).add_modifier(Modifier::BOLD),
             ));
             mid_spans.push(Span::styled("│", Style::default().fg(border_color)));
 
@@ -532,9 +529,10 @@ fn render_pipeline(f: &mut Frame, area: Rect, state: &WorkflowBuilderState) {
             let first_node = &state.nodes[layer[0]];
             // Check if any node in next layer needs this node
             let next_layer = &layers[layer_idx + 1];
-            let has_connection = next_layer.iter().any(|&ni| {
-                state.nodes[ni].needs.contains(&first_node.id)
-            }) || !next_layer.is_empty();
+            let has_connection = next_layer
+                .iter()
+                .any(|&ni| state.nodes[ni].needs.contains(&first_node.id))
+                || !next_layer.is_empty();
 
             if has_connection {
                 arrow_spans.push(Span::styled(
@@ -630,7 +628,9 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
 
     match state.mode {
         BuilderMode::Navigate => handle_navigate_key(state, key),
-        BuilderMode::EditName | BuilderMode::EditUses | BuilderMode::EditRun
+        BuilderMode::EditName
+        | BuilderMode::EditUses
+        | BuilderMode::EditRun
         | BuilderMode::EditWorkflowName => handle_edit_key(state, key),
         BuilderMode::Connect => handle_connect_key(state, key),
         BuilderMode::SelectTrigger => handle_trigger_key(state, key),
@@ -677,20 +677,14 @@ fn handle_navigate_key(state: &mut WorkflowBuilderState, key: KeyEvent) {
             // Edit uses directly
             if !state.nodes.is_empty() {
                 state.mode = BuilderMode::EditUses;
-                state.input_buffer = state.nodes[state.selected]
-                    .uses
-                    .clone()
-                    .unwrap_or_default();
+                state.input_buffer = state.nodes[state.selected].uses.clone().unwrap_or_default();
             }
         }
         KeyCode::Char('r') => {
             // Edit run directly
             if !state.nodes.is_empty() {
                 state.mode = BuilderMode::EditRun;
-                state.input_buffer = state.nodes[state.selected]
-                    .run
-                    .clone()
-                    .unwrap_or_default();
+                state.input_buffer = state.nodes[state.selected].run.clone().unwrap_or_default();
             }
         }
         KeyCode::Char('d') => {
@@ -713,11 +707,7 @@ fn handle_navigate_key(state: &mut WorkflowBuilderState, key: KeyEvent) {
             // Generate YAML
             let yaml = state.generate_yaml();
             let dir = ".github/workflows";
-            let filename = format!(
-                "{}/{}.yml",
-                dir,
-                sanitize_job_id(&state.workflow_name)
-            );
+            let filename = format!("{}/{}.yml", dir, sanitize_job_id(&state.workflow_name));
             if let Err(e) = std::fs::create_dir_all(dir) {
                 state.status = Some(format!("Error creating dir: {}", e));
                 return;
@@ -775,33 +765,23 @@ fn handle_edit_key(state: &mut WorkflowBuilderState, key: KeyEvent) {
                         // Editing existing node name
                         state.nodes[state.selected].name = value;
                         state.mode = BuilderMode::EditUses;
-                        state.input_buffer = state.nodes[state.selected]
-                            .uses
-                            .clone()
-                            .unwrap_or_default();
+                        state.input_buffer =
+                            state.nodes[state.selected].uses.clone().unwrap_or_default();
                     }
                 }
                 BuilderMode::EditUses => {
                     if !state.nodes.is_empty() && state.selected < state.nodes.len() {
-                        state.nodes[state.selected].uses = if value.is_empty() {
-                            None
-                        } else {
-                            Some(value)
-                        };
+                        state.nodes[state.selected].uses =
+                            if value.is_empty() { None } else { Some(value) };
                         state.mode = BuilderMode::EditRun;
-                        state.input_buffer = state.nodes[state.selected]
-                            .run
-                            .clone()
-                            .unwrap_or_default();
+                        state.input_buffer =
+                            state.nodes[state.selected].run.clone().unwrap_or_default();
                     }
                 }
                 BuilderMode::EditRun => {
                     if !state.nodes.is_empty() && state.selected < state.nodes.len() {
-                        state.nodes[state.selected].run = if value.is_empty() {
-                            None
-                        } else {
-                            Some(value)
-                        };
+                        state.nodes[state.selected].run =
+                            if value.is_empty() { None } else { Some(value) };
                         state.mode = BuilderMode::Navigate;
                         state.status = Some("✓ Step updated".to_string());
                     }
@@ -829,24 +809,30 @@ fn handle_edit_key(state: &mut WorkflowBuilderState, key: KeyEvent) {
                         }
                     }
                     state.mode = BuilderMode::EditUses;
-                    state.input_buffer = state.nodes.get(state.selected)
+                    state.input_buffer = state
+                        .nodes
+                        .get(state.selected)
                         .and_then(|n| n.uses.clone())
                         .unwrap_or_default();
                 }
                 BuilderMode::EditUses => {
                     let value = state.input_buffer.trim().to_string();
                     if !state.nodes.is_empty() && state.selected < state.nodes.len() {
-                        state.nodes[state.selected].uses = if value.is_empty() { None } else { Some(value) };
+                        state.nodes[state.selected].uses =
+                            if value.is_empty() { None } else { Some(value) };
                     }
                     state.mode = BuilderMode::EditRun;
-                    state.input_buffer = state.nodes.get(state.selected)
+                    state.input_buffer = state
+                        .nodes
+                        .get(state.selected)
                         .and_then(|n| n.run.clone())
                         .unwrap_or_default();
                 }
                 BuilderMode::EditRun => {
                     let value = state.input_buffer.trim().to_string();
                     if !state.nodes.is_empty() && state.selected < state.nodes.len() {
-                        state.nodes[state.selected].run = if value.is_empty() { None } else { Some(value) };
+                        state.nodes[state.selected].run =
+                            if value.is_empty() { None } else { Some(value) };
                     }
                     state.mode = BuilderMode::Navigate;
                     state.input_buffer.clear();
@@ -891,13 +877,10 @@ fn handle_connect_key(state: &mut WorkflowBuilderState, key: KeyEvent) {
                                 .map(|n| n.name.as_str())
                                 .unwrap_or("?");
                             let to_name = &state.nodes[state.selected].name;
-                            state.status = Some(format!(
-                                "✓ Connected: {} → {}",
-                                from_name, to_name
-                            ));
-                        } else {
                             state.status =
-                                Some("Already connected".to_string());
+                                Some(format!("✓ Connected: {} → {}", from_name, to_name));
+                        } else {
+                            state.status = Some("Already connected".to_string());
                         }
                     }
                 }

@@ -22,6 +22,7 @@ pub trait AiProvider: Send + Sync {
     fn name(&self) -> &str;
 
     /// Model being used (for display).
+    #[allow(dead_code)]
     fn model_name(&self) -> &str;
 }
 
@@ -112,6 +113,7 @@ pub fn create_provider(config: &AiConfig) -> Option<Box<dyn AiProvider>> {
 pub struct BedrockProvider {
     pub endpoint: String,
     pub api_key: String,
+    #[allow(dead_code)]
     pub timeout: u64,
     client: reqwest::blocking::Client,
 }
@@ -155,7 +157,8 @@ impl AiProvider for BedrockProvider {
             error: None,
         };
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -169,7 +172,8 @@ impl AiProvider for BedrockProvider {
             anyhow::bail!("Bedrock API error (HTTP {}): {}", status, body);
         }
 
-        let api_resp: BedrockApiResponse = resp.json().context("Failed to parse Bedrock response")?;
+        let api_resp: BedrockApiResponse =
+            resp.json().context("Failed to parse Bedrock response")?;
         if !api_resp.success {
             anyhow::bail!("Bedrock error: {}", api_resp.error.unwrap_or_default());
         }
@@ -182,7 +186,8 @@ impl AiProvider for BedrockProvider {
 
     fn health_check(&self) -> Result<String> {
         let url = self.endpoint.replace("/mentor", "/health");
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .header("x-api-key", &self.api_key)
             .send()
@@ -204,8 +209,10 @@ impl AiProvider for BedrockProvider {
 impl BedrockProvider {
     /// Send a raw `MentorRequest`-shaped JSON body to the Lambda endpoint.
     /// This is the primary path for Bedrock — keeps full compatibility.
+    #[allow(dead_code)]
     pub fn call_raw(&self, body: &serde_json::Value) -> Result<String> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -237,6 +244,7 @@ pub struct OpenAiCompatibleProvider {
     pub endpoint: String,
     pub api_key: String,
     pub model: String,
+    #[allow(dead_code)]
     pub timeout: u64,
     pub provider_name: String,
     client: reqwest::blocking::Client,
@@ -281,7 +289,9 @@ impl AiProvider for OpenAiCompatibleProvider {
     fn chat(&self, system_prompt: &str, user_message: &str) -> Result<String> {
         log::debug!(
             "[{}] chat: endpoint={} model={}",
-            self.provider_name, self.endpoint, self.model
+            self.provider_name,
+            self.endpoint,
+            self.model
         );
         let req = OpenAiRequest {
             model: self.model.clone(),
@@ -299,7 +309,8 @@ impl AiProvider for OpenAiCompatibleProvider {
             temperature: 0.7,
         };
 
-        let mut builder = self.client
+        let mut builder = self
+            .client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.api_key));
@@ -318,11 +329,26 @@ impl AiProvider for OpenAiCompatibleProvider {
 
         let status = resp.status().as_u16();
         let body_text = resp.text().unwrap_or_default();
-        log::debug!("[{}] response: status={} body_len={}", self.provider_name, status, body_text.len());
+        log::debug!(
+            "[{}] response: status={} body_len={}",
+            self.provider_name,
+            status,
+            body_text.len()
+        );
 
         if status != 200 {
-            log::error!("[{}] API error (HTTP {}): {}", self.provider_name, status, body_text);
-            anyhow::bail!("{} API error (HTTP {}): {}", self.provider_name, status, body_text);
+            log::error!(
+                "[{}] API error (HTTP {}): {}",
+                self.provider_name,
+                status,
+                body_text
+            );
+            anyhow::bail!(
+                "{} API error (HTTP {}): {}",
+                self.provider_name,
+                status,
+                body_text
+            );
         }
 
         let parsed: OpenAiResponse =
@@ -343,7 +369,10 @@ impl AiProvider for OpenAiCompatibleProvider {
         // Simple connectivity test — send a tiny request
         let result = self.chat("You are a helpful assistant.", "Say 'ok'.");
         match result {
-            Ok(_) => Ok(format!("{} ({}) — reachable ✓", self.provider_name, self.model)),
+            Ok(_) => Ok(format!(
+                "{} ({}) — reachable ✓",
+                self.provider_name, self.model
+            )),
             Err(e) => Err(e),
         }
     }
@@ -363,6 +392,7 @@ pub struct AnthropicProvider {
     pub endpoint: String,
     pub api_key: String,
     pub model: String,
+    #[allow(dead_code)]
     pub timeout: u64,
     client: reqwest::blocking::Client,
 }
@@ -409,7 +439,8 @@ impl AiProvider for AnthropicProvider {
             }],
         };
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
@@ -461,6 +492,7 @@ impl AiProvider for AnthropicProvider {
 pub struct OllamaProvider {
     pub endpoint: String,
     pub model: String,
+    #[allow(dead_code)]
     pub timeout: u64,
     client: reqwest::blocking::Client,
 }
@@ -508,7 +540,8 @@ impl AiProvider for OllamaProvider {
 
         let url = format!("{}/api/chat", self.endpoint.trim_end_matches('/'));
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&req)
@@ -538,13 +571,17 @@ impl AiProvider for OllamaProvider {
     fn health_check(&self) -> Result<String> {
         let url = format!("{}/api/tags", self.endpoint.trim_end_matches('/'));
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .send()
             .context("Cannot reach Ollama — is it running? (ollama serve)")?;
 
         if resp.status().is_success() {
-            Ok(format!("Ollama ({}) at {} — reachable ✓", self.model, self.endpoint))
+            Ok(format!(
+                "Ollama ({}) at {} — reachable ✓",
+                self.model, self.endpoint
+            ))
         } else {
             anyhow::bail!("Ollama returned HTTP {}", resp.status().as_u16())
         }

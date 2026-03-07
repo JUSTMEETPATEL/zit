@@ -350,7 +350,13 @@ pub fn get_merge_preview_diff(other_ref: &str) -> Result<String> {
 #[allow(dead_code)]
 pub fn check_merge_conflicts(other_ref: &str) -> Result<Vec<String>> {
     // Try git merge-tree first (safe: no worktree modification)
-    let merge_tree_result = run_git(&["merge-tree", "--write-tree", "--no-messages", "HEAD", other_ref]);
+    let merge_tree_result = run_git(&[
+        "merge-tree",
+        "--write-tree",
+        "--no-messages",
+        "HEAD",
+        other_ref,
+    ]);
 
     match merge_tree_result {
         Ok(output) => {
@@ -381,9 +387,7 @@ pub fn check_merge_conflicts(other_ref: &str) -> Result<Vec<String>> {
                 let conflicts: Vec<String> = err_str
                     .lines()
                     .filter(|line| line.contains("CONFLICT"))
-                    .filter_map(|line| {
-                        line.rsplit(" in ").next().map(|s| s.trim().to_string())
-                    })
+                    .filter_map(|line| line.rsplit(" in ").next().map(|s| s.trim().to_string()))
                     .collect();
                 Ok(conflicts)
             } else if err_str.contains("not a git command") || err_str.contains("merge-tree") {

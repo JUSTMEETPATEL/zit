@@ -156,7 +156,8 @@ impl AiConfig {
         };
 
         // Config file, then env var
-        let from_config = self.endpoint
+        let from_config = self
+            .endpoint
             .clone()
             .or_else(|| std::env::var("ZIT_AI_ENDPOINT").ok());
 
@@ -174,7 +175,8 @@ impl AiConfig {
                 if is_stale {
                     log::debug!(
                         "[config] Ignoring stale endpoint '{}' for provider '{}', using default",
-                        ep, provider
+                        ep,
+                        provider
                     );
                     return default_for_provider.map(|s| s.to_string());
                 }
@@ -214,6 +216,7 @@ impl AiConfig {
 
     /// Resolve endpoint: config file first, then ZIT_AI_ENDPOINT env var.
     /// (Legacy helper — prefer effective_endpoint() for provider-aware resolution.)
+    #[allow(dead_code)]
     pub fn resolved_endpoint(&self) -> Option<String> {
         self.effective_endpoint()
     }
@@ -241,9 +244,14 @@ impl AiConfig {
         // Check endpoint (required for bedrock, optional for ollama, ignored for others)
         match provider {
             "bedrock" => {
-                match self.endpoint.as_ref().or(std::env::var("ZIT_AI_ENDPOINT").ok().as_ref()) {
+                match self
+                    .endpoint
+                    .as_ref()
+                    .or(std::env::var("ZIT_AI_ENDPOINT").ok().as_ref())
+                {
                     None => issues.push(
-                        "Bedrock requires an endpoint — set your Lambda API Gateway URL".to_string(),
+                        "Bedrock requires an endpoint — set your Lambda API Gateway URL"
+                            .to_string(),
                     ),
                     Some(ref url) => {
                         if !url.starts_with("https://") && !url.starts_with("http://") {
@@ -281,7 +289,8 @@ impl AiConfig {
         // Check model (required for openrouter)
         if provider == "openrouter" && self.model.is_none() {
             issues.push(
-                "OpenRouter requires a model — e.g. model = \"anthropic/claude-sonnet-4\"".to_string(),
+                "OpenRouter requires a model — e.g. model = \"anthropic/claude-sonnet-4\""
+                    .to_string(),
             );
         }
 
@@ -408,12 +417,20 @@ mod tests {
 
     #[test]
     fn test_ai_effective_model_defaults() {
-        let mut a = AiConfig::default();
-        a.provider = "openai".to_string();
+        let a = AiConfig {
+            provider: "openai".to_string(),
+            ..AiConfig::default()
+        };
         assert_eq!(a.effective_model(), "gpt-4o");
-        a.provider = "ollama".to_string();
+        let a = AiConfig {
+            provider: "ollama".to_string(),
+            ..AiConfig::default()
+        };
         assert_eq!(a.effective_model(), "llama3.1");
-        a.provider = "anthropic".to_string();
+        let a = AiConfig {
+            provider: "anthropic".to_string(),
+            ..AiConfig::default()
+        };
         assert_eq!(a.effective_model(), "claude-sonnet-4-20250514");
     }
 
@@ -702,13 +719,20 @@ mod tests {
     #[test]
     fn test_effective_endpoint_provider_defaults() {
         std::env::remove_var("ZIT_AI_ENDPOINT");
-        let mut a = AiConfig::default();
-        a.provider = "openai".to_string();
+        let a = AiConfig {
+            provider: "openai".to_string(),
+            ..AiConfig::default()
+        };
         assert!(a.effective_endpoint().unwrap().contains("openai.com"));
-        a.provider = "ollama".to_string();
+        let a = AiConfig {
+            provider: "ollama".to_string(),
+            ..AiConfig::default()
+        };
         assert!(a.effective_endpoint().unwrap().contains("localhost:11434"));
-        a.provider = "bedrock".to_string();
+        let a = AiConfig {
+            provider: "bedrock".to_string(),
+            ..AiConfig::default()
+        };
         assert!(a.effective_endpoint().is_none()); // bedrock requires explicit
     }
 }
-
