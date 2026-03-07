@@ -208,7 +208,7 @@ class TestLambdaHandler:
         assert resp["statusCode"] == 500
         body = json.loads(resp["body"])
         assert body["success"] is False
-        assert "Bedrock timeout" in body["error"]
+        assert "Internal server error" in body["error"]
 
     def test_dict_body_passthrough(self):
         """Test when API Gateway passes body as dict (test invocation)."""
