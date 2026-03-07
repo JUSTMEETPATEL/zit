@@ -42,6 +42,7 @@ pub fn diff_line_color(line: &str) -> Color {
 
 /// Navigate a list selection by delta, clamping to bounds.
 /// Returns the new selected index.
+#[allow(dead_code)]
 pub fn navigate_list(current: usize, delta: isize, len: usize) -> usize {
     if len == 0 {
         return 0;

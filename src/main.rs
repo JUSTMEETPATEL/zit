@@ -257,7 +257,14 @@ fn draw(f: &mut Frame, app: &mut App) {
                 .as_ref()
                 .map(|c| c.provider_name().to_string())
                 .unwrap_or_default();
-            ui::ai_mentor::render(f, area, &app.ai_mentor_state, ai_available, loading, &provider_label);
+            ui::ai_mentor::render(
+                f,
+                area,
+                &app.ai_mentor_state,
+                ai_available,
+                loading,
+                &provider_label,
+            );
         }
         View::Stash => {
             ui::stash::render(f, area, &mut app.stash_state);

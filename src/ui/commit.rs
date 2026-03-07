@@ -208,7 +208,7 @@ pub fn render(
             // Each line takes ceil(len / width) visual lines, minimum 1
             let line_len = line.len().max(1);
             if editor_inner_width > 0 {
-                visual_y += ((line_len + editor_inner_width - 1) / editor_inner_width) as u16;
+                visual_y += line_len.div_ceil(editor_inner_width) as u16;
             } else {
                 visual_y += 1;
             }

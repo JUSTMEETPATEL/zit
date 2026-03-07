@@ -167,6 +167,7 @@ impl AiClient {
     }
 
     /// The model being used.
+    #[allow(dead_code)]
     pub fn model_name(&self) -> &str {
         self.provider.model_name()
     }
@@ -338,18 +339,22 @@ impl AiClient {
 
     /// Direct provider path: build prompts client-side, call provider.chat().
     fn call_direct(&self, request: &MentorRequest) -> Result<String> {
-        let ctx = request.context.as_ref().cloned().unwrap_or_else(|| RepoContext {
-            branch: None,
-            staged_files: vec![],
-            unstaged_files: vec![],
-            diff_stats: None,
-            diff: None,
-            conflict_files: vec![],
-            conflict_diff: None,
-            has_conflicts: false,
-            merge_type: None,
-            detached_head: false,
-        });
+        let ctx = request
+            .context
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| RepoContext {
+                branch: None,
+                staged_files: vec![],
+                unstaged_files: vec![],
+                diff_stats: None,
+                diff: None,
+                conflict_files: vec![],
+                conflict_diff: None,
+                has_conflicts: false,
+                merge_type: None,
+                detached_head: false,
+            });
 
         let system_prompt = prompts::system_prompt_for(&request.request_type);
         let user_message = prompts::build_user_message(
@@ -568,8 +573,8 @@ impl AiClient {
     pub fn generate_gitignore(&self) -> Result<String> {
         // Collect file listing: tracked + untracked (excluding ignored)
         let tracked = git::run_git(&["ls-files"]).unwrap_or_default();
-        let untracked = git::run_git(&["ls-files", "--others", "--exclude-standard"])
-            .unwrap_or_default();
+        let untracked =
+            git::run_git(&["ls-files", "--others", "--exclude-standard"]).unwrap_or_default();
 
         let mut file_listing = String::new();
         for line in tracked.lines().chain(untracked.lines()) {
@@ -1033,7 +1038,9 @@ mod tests {
         assert!(AiClient::from_config(&cfg).is_some());
         // But validate() should flag the bad scheme
         let issues = cfg.validate();
-        assert!(issues.iter().any(|i| i.contains("must start with https://")));
+        assert!(issues
+            .iter()
+            .any(|i| i.contains("must start with https://")));
     }
 
     // ── is_configured tests ──────────────────────────────────────

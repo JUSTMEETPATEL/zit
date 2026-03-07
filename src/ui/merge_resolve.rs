@@ -58,14 +58,20 @@ impl MergeResolveState {
         let saved_follow_ups = std::mem::take(&mut self.follow_ups);
         let saved_scroll_center = self.scroll_center;
 
-        log::debug!("[MergeResolve] refresh: saved ai_suggestion={}", saved_ai_suggestion.is_some());
+        log::debug!(
+            "[MergeResolve] refresh: saved ai_suggestion={}",
+            saved_ai_suggestion.is_some()
+        );
 
         // Refresh conflict list
         let status = git::status::get_status().unwrap_or_default();
         self.conflicted_files = status.conflicts;
         self.merge_state = git::merge::get_merge_state();
 
-        log::debug!("[MergeResolve] refresh: {} conflicted files", self.conflicted_files.len());
+        log::debug!(
+            "[MergeResolve] refresh: {} conflicted files",
+            self.conflicted_files.len()
+        );
 
         // Clamp selected file
         if self.selected_file >= self.conflicted_files.len() && !self.conflicted_files.is_empty() {

@@ -3,8 +3,8 @@
 //! These are used by direct providers (OpenAI, Anthropic, OpenRouter, Ollama).
 //! The Bedrock provider sends raw requests to Lambda, which has its own copy.
 
-use crate::ai::client::RepoContext;
 use super::DIFF_TRUNCATE_AT;
+use crate::ai::client::RepoContext;
 
 // ─── System Prompts ────────────────────────────────────────────
 
@@ -221,14 +221,24 @@ pub fn format_context(ctx: &RepoContext) -> String {
         lines.push(format!(
             "Staged Files ({}): {}",
             ctx.staged_files.len(),
-            ctx.staged_files.iter().take(5).cloned().collect::<Vec<_>>().join(", ")
+            ctx.staged_files
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     if !ctx.unstaged_files.is_empty() {
         lines.push(format!(
             "Unstaged Files ({}): {}",
             ctx.unstaged_files.len(),
-            ctx.unstaged_files.iter().take(5).cloned().collect::<Vec<_>>().join(", ")
+            ctx.unstaged_files
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     if ctx.has_conflicts {
@@ -238,7 +248,12 @@ pub fn format_context(ctx: &RepoContext) -> String {
         lines.push(format!(
             "Conflicted Files ({}): {}",
             ctx.conflict_files.len(),
-            ctx.conflict_files.iter().take(10).cloned().collect::<Vec<_>>().join(", ")
+            ctx.conflict_files
+                .iter()
+                .take(10)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     if let Some(ref cd) = ctx.conflict_diff {
@@ -286,10 +301,14 @@ pub fn build_user_message(
             } else {
                 ctx.staged_files.join(", ")
             };
-            let diff_preview = ctx.diff.as_ref().map(|d| {
-                let trimmed: String = d.chars().take(DIFF_TRUNCATE_AT).collect();
-                format!("Diff Preview: {}...", trimmed)
-            }).unwrap_or_default();
+            let diff_preview = ctx
+                .diff
+                .as_ref()
+                .map(|d| {
+                    let trimmed: String = d.chars().take(DIFF_TRUNCATE_AT).collect();
+                    format!("Diff Preview: {}...", trimmed)
+                })
+                .unwrap_or_default();
 
             let ds = ctx.diff_stats.as_ref();
             format!(
@@ -316,7 +335,8 @@ pub fn build_user_message(
             } else {
                 ctx.staged_files.join(", ")
             };
-            let notes = query.map(|q| format!("Reviewer Notes: {}", q))
+            let notes = query
+                .map(|q| format!("Reviewer Notes: {}", q))
                 .unwrap_or_else(|| "Review this diff for issues and improvements.".to_string());
             format!(
                 "Repository Context:\n{}\n\nFiles Under Review: {}\n\nDiff Content:\n{}\n\n{}",
@@ -324,23 +344,32 @@ pub fn build_user_message(
             )
         }
         "merge_resolve" => {
-            let conflict_diff = ctx.conflict_diff.as_deref().unwrap_or("No conflict content provided");
+            let conflict_diff = ctx
+                .conflict_diff
+                .as_deref()
+                .unwrap_or("No conflict content provided");
             let trimmed: String = conflict_diff.chars().take(DIFF_TRUNCATE_AT).collect();
             let conflict_files = if ctx.conflict_files.is_empty() {
                 "Unknown".to_string()
             } else {
                 ctx.conflict_files.join(", ")
             };
-            let notes = query.map(|q| format!("Developer Notes: {}", q))
-                .unwrap_or_else(|| "Analyze this merge conflict and recommend the best resolution.".to_string());
+            let notes = query
+                .map(|q| format!("Developer Notes: {}", q))
+                .unwrap_or_else(|| {
+                    "Analyze this merge conflict and recommend the best resolution.".to_string()
+                });
             format!(
                 "Repository Context:\n{}\n\nConflicted Files: {}\n\nConflict Content (with markers):\n{}\n\n{}",
                 context_str, conflict_files, trimmed, notes
             )
         }
         "merge_strategy" => {
-            let notes = query.map(|q| format!("Developer Question: {}", q))
-                .unwrap_or_else(|| "What is the safest strategy to integrate these branches?".to_string());
+            let notes = query
+                .map(|q| format!("Developer Question: {}", q))
+                .unwrap_or_else(|| {
+                    "What is the safest strategy to integrate these branches?".to_string()
+                });
             format!(
                 "Repository Context:\n{}\n\n{}\n\nPlease recommend the best merge/rebase strategy given the current repository state.",
                 context_str, notes
@@ -348,7 +377,8 @@ pub fn build_user_message(
         }
         "generate_gitignore" => {
             let file_listing = query.unwrap_or("No file listing available.");
-            let existing = error.map(|e| format!("\n\nExisting .gitignore:\n{}", e))
+            let existing = error
+                .map(|e| format!("\n\nExisting .gitignore:\n{}", e))
                 .unwrap_or_default();
             format!(
                 "Project File Structure:\n{}{}\n\nGenerate a comprehensive .gitignore for this project.",
@@ -374,7 +404,16 @@ mod tests {
 
     #[test]
     fn test_system_prompt_for_all_types() {
-        let types = ["explain", "error", "recommend", "commit_suggestion", "learn", "review", "merge_resolve", "merge_strategy"];
+        let types = [
+            "explain",
+            "error",
+            "recommend",
+            "commit_suggestion",
+            "learn",
+            "review",
+            "merge_resolve",
+            "merge_strategy",
+        ];
         for t in &types {
             let prompt = system_prompt_for(t);
             assert!(!prompt.is_empty(), "prompt for '{}' should not be empty", t);

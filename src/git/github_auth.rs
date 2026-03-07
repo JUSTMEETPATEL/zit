@@ -605,6 +605,7 @@ pub struct WorkflowRun {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorkflowRunsResponse {
+    #[allow(dead_code)]
     pub total_count: u64,
     pub workflow_runs: Vec<WorkflowRun>,
 }
@@ -633,6 +634,7 @@ pub struct JobStep {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorkflowJobsResponse {
+    #[allow(dead_code)]
     pub total_count: u64,
     pub jobs: Vec<WorkflowJob>,
 }
@@ -698,9 +700,9 @@ pub fn get_job_logs(token: &str, job_id: u64) -> Result<String> {
         // GitHub redirects to a temporary URL for log downloads
         if let Some(location) = resp.headers().get("location") {
             let redirect_url = location.to_str().unwrap_or("");
-            let log_resp = reqwest::blocking::get(redirect_url)
-                .context("Failed to follow log redirect")?;
-            return Ok(log_resp.text().context("Failed to read log text")?);
+            let log_resp =
+                reqwest::blocking::get(redirect_url).context("Failed to follow log redirect")?;
+            return log_resp.text().context("Failed to read log text");
         }
     }
 
@@ -709,5 +711,5 @@ pub fn get_job_logs(token: &str, job_id: u64) -> Result<String> {
         anyhow::bail!("Failed to fetch logs ({}): {}", status, body);
     }
 
-    Ok(resp.text().context("Failed to read log text")?)
+    resp.text().context("Failed to read log text")
 }
