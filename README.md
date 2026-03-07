@@ -9,15 +9,20 @@
 
 ## Features
 
-- **Repository Dashboard**: At-a-glance status of your repo — branch, dirty state, recent commits (`d`)
-- **Smart Staging**: Interactive file staging with diff previews and search (`s`)
-- **Guided Commits**: Commit editor with validation, history lookup, and AI suggestions (`c`)
-- **Visual Branching**: Create, switch, delete, rename branches visually (`b`)
-- **Commit Timeline**: Browse git log with a visual commit graph (`l`)
-- **Time Travel**: Safe reset/restore with confirmation dialogs (`t`)
-- **Reflog Recovery**: Browse and recover "lost" commits from the reflog (`r`)
-- **GitHub Integration**: OAuth device flow, repo creation, push/pull/sync, collaborators (`g`)
-- **🤖 AI Mentor**: AI-powered assistant for explanations, recommendations, and error help (`a`)
+- **Repository Dashboard** — at-a-glance repo status: branch, dirty state, recent commits
+- **Smart Staging** — interactive file staging with diff previews, hunk-level staging, and search (`s`)
+- **Guided Commits** — commit editor with subject/body validation, AI-generated messages (`c`)
+- **Visual Branching** — create, switch, delete, rename branches; toggle local/remote (`b`)
+- **Commit Timeline** — browse git log with a visual commit graph and search (`l`)
+- **Time Travel** — safe reset/restore (soft, mixed, hard) with confirmation dialogs (`t`)
+- **Reflog Recovery** — browse and recover "lost" commits from the reflog (`r`)
+- **Stash Manager** — save, pop, apply, drop, and clear stashes (`x`)
+- **Merge Resolve** — conflict resolution with ours/theirs/AI-assisted merge (`m`)
+- **Git Bisect** — interactive binary search for bug-introducing commits (`B`)
+- **Cherry Pick** — pick commits from other branches with multi-select (`p`)
+- **Workflow Builder** — visually compose multi-step git workflows (`w`)
+- **GitHub Integration** — OAuth device flow, repo creation, push/pull/sync, collaborators (`g`)
+- **🤖 AI Mentor** — AI-powered assistant for explanations, recommendations, and error help (`a`)
 
 ## Installation
 
@@ -54,6 +59,11 @@ zit
 | `l` | **Log** — visual commit timeline / graph |
 | `t` | **Time Travel** — reset / restore safely |
 | `r` | **Reflog** — recover lost commits |
+| `x` | **Stash** — save, pop, apply, drop stashes |
+| `m` | **Merge Resolve** — resolve merge conflicts |
+| `B` | **Bisect** — binary search for bad commits |
+| `p` | **Cherry Pick** — pick commits from other branches |
+| `w` | **Workflow** — build multi-step git workflows |
 | `g` | **GitHub** — sync, push/pull, collaborators |
 | `a` | **AI Mentor** — explain repo, ask questions, get recommendations |
 | `?` | **Help** — context-sensitive keybinding reference |
@@ -150,7 +160,7 @@ cargo build
 make check
 
 # Run tests
-cargo test --all-targets        # 13 Rust tests
+cargo test --all-targets        # 178 Rust tests
 cd aws && python3 -m pytest tests/ -v   # 27 Lambda tests
 
 # Lint
@@ -164,39 +174,53 @@ cargo build --release
 
 ```
 src/
-├── main.rs          # Entry point, terminal setup, render loop
-├── app.rs           # App state, view routing, async AI dispatch
-├── config.rs        # Config loading (~/.config/zit/config.toml)
-├── event.rs         # Keyboard/tick event handling
+├── main.rs            # Entry point, terminal setup, render loop
+├── app.rs             # App state, view routing, async AI dispatch
+├── config.rs          # Config loading (~/.config/zit/config.toml)
+├── event.rs           # Keyboard/tick event handling
+├── keychain.rs        # macOS Keychain integration
 ├── ai/
-│   └── client.rs    # AI client (retry, error classification, background threads)
+│   ├── client.rs      # AI client (retry, error classification, background threads)
+│   ├── prompts.rs     # AI prompt templates
+│   └── provider.rs    # AI provider abstraction
 ├── git/
-│   ├── runner.rs    # Core git command executor
-│   ├── status.rs    # git status parser
-│   ├── diff.rs      # git diff parser
-│   ├── log.rs       # git log parser with graph support
-│   ├── branch.rs    # Branch operations
-│   ├── remote.rs    # Remote/push/pull operations
-│   ├── reflog.rs    # Reflog parser
-│   └── github_auth.rs  # GitHub OAuth device flow
+│   ├── runner.rs      # Core git command executor
+│   ├── status.rs      # git status parser
+│   ├── diff.rs        # git diff parser
+│   ├── log.rs         # git log parser with graph support
+│   ├── branch.rs      # Branch operations
+│   ├── merge.rs       # Merge operations & conflict detection
+│   ├── remote.rs      # Remote/push/pull operations
+│   ├── stash.rs       # Stash operations
+│   ├── reflog.rs      # Reflog parser
+│   ├── bisect.rs      # Git bisect operations
+│   ├── cherry_pick.rs # Cherry-pick operations
+│   └── github_auth.rs # GitHub OAuth device flow
 └── ui/
-    ├── dashboard.rs  # Repository dashboard view
-    ├── staging.rs    # Interactive staging view
-    ├── commit.rs     # Commit editor view
-    ├── branches.rs   # Branch manager view
-    ├── timeline.rs   # Commit log/graph view
-    ├── time_travel.rs # Reset/restore view
-    ├── reflog.rs     # Reflog viewer
-    ├── github.rs     # GitHub integration view
-    ├── ai_mentor.rs  # AI Mentor panel (menu, input, result)
-    └── help.rs       # Context-sensitive help overlay
+    ├── dashboard.rs       # Repository dashboard view
+    ├── staging.rs         # Interactive staging view
+    ├── commit.rs          # Commit editor view
+    ├── branches.rs        # Branch manager view
+    ├── timeline.rs        # Commit log/graph view
+    ├── time_travel.rs     # Reset/restore view
+    ├── reflog.rs          # Reflog viewer
+    ├── stash.rs           # Stash manager view
+    ├── merge_resolve.rs   # Merge conflict resolution view
+    ├── bisect.rs          # Git bisect interactive view
+    ├── cherry_pick.rs     # Cherry-pick interactive view
+    ├── workflow_builder.rs # Workflow builder view
+    ├── github.rs          # GitHub integration view
+    ├── ai_mentor.rs       # AI Mentor panel (menu, input, result)
+    ├── help.rs            # Context-sensitive help overlay
+    └── utils.rs           # Shared UI utilities
 aws/
-├── deploy.sh        # One-command deployment script
+├── deploy.sh          # One-command deployment script
 ├── lambda/
-│   ├── handler.py   # Lambda function (Bedrock integration)
-│   └── prompts.py   # AI system prompts per request type
+│   ├── handler.py     # Lambda function (Bedrock integration)
+│   └── prompts.py     # AI system prompts per request type
 └── infrastructure/
-    └── template.yaml # SAM/CloudFormation template
+    └── template.yaml  # SAM/CloudFormation template
+website/                   # Next.js marketing site
 ```
 
 ## Troubleshooting
