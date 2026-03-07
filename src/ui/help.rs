@@ -29,6 +29,8 @@ pub fn render(f: &mut Frame, area: Rect, current_view: View) {
             ("x", "Open Stash view"),
             ("m", "Open Merge Resolve view"),
             ("w", "Open Workflow Builder"),
+            ("B", "Open Bisect view"),
+            ("p", "Open Cherry Pick view"),
             ("?", "Toggle this help"),
             ("q", "Quit"),
             ("Ctrl+C", "Force quit"),
@@ -147,6 +149,27 @@ pub fn render(f: &mut Frame, area: Rect, current_view: View) {
             ("Esc", "Cancel / Go back"),
             ("q", "Back to Dashboard"),
         ],
+        View::Bisect => vec![
+            ("↑/↓ or j/k", "Navigate commits"),
+            ("Enter", "Select commit (bad → good → start)"),
+            ("g", "Mark current commit as good"),
+            ("b", "Mark current commit as bad"),
+            ("s", "Skip current commit"),
+            ("R", "Reset / end bisect session"),
+            ("PgDn/PgUp", "Scroll log"),
+            ("Esc", "Back one step"),
+            ("q", "Back to Dashboard"),
+        ],
+        View::CherryPick => vec![
+            ("↑/↓ or j/k", "Navigate branches / commits"),
+            ("Enter", "Select branch / Apply cherry-pick"),
+            ("Space", "Toggle mark commit for multi-pick"),
+            ("c", "Continue after conflict"),
+            ("A", "Abort cherry-pick"),
+            ("PgDn/PgUp", "Scroll diff"),
+            ("Esc", "Back to branch select"),
+            ("q", "Back to Dashboard"),
+        ],
     };
 
     let view_name = match current_view {
@@ -162,6 +185,8 @@ pub fn render(f: &mut Frame, area: Rect, current_view: View) {
         View::Stash => "Stash",
         View::MergeResolve => "Merge Resolve",
         View::WorkflowBuilder => "Workflow Builder",
+        View::Bisect => "Bisect",
+        View::CherryPick => "Cherry Pick",
     };
 
     let mut lines = vec![

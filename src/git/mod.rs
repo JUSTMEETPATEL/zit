@@ -1,4 +1,6 @@
+pub mod bisect;
 pub mod branch;
+pub mod cherry_pick;
 pub mod diff;
 pub mod github_auth;
 pub mod log;
