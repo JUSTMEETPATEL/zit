@@ -21,7 +21,7 @@
 - **Git Bisect** — interactive binary search for bug-introducing commits (`B`)
 - **Cherry Pick** — pick commits from other branches with multi-select (`p`)
 - **Workflow Builder** — visually compose multi-step git workflows (`w`)
-- **GitHub Integration** — OAuth device flow, repo creation, push/pull/sync, collaborators (`g`)
+- **GitHub Integration** — OAuth device flow, repo creation, push/pull/sync, collaborators, pull requests, and CI/CD actions (`g`)
 - **🤖 AI Mentor** — AI-powered assistant for explanations, recommendations, and error help (`a`)
 
 ## Installation
@@ -49,6 +49,15 @@ cd my-repo
 zit
 ```
 
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `--help`, `-h` | Print help and available views |
+| `--version`, `-v` | Print version |
+| `--verbose` | Enable debug logging (`ZIT_LOG=debug`) |
+| `--no-ai` | Disable AI features for this session |
+
 ### Keybindings
 
 | Key | Action |
@@ -64,7 +73,7 @@ zit
 | `B` | **Bisect** — binary search for bad commits |
 | `p` | **Cherry Pick** — pick commits from other branches |
 | `w` | **Workflow** — build multi-step git workflows |
-| `g` | **GitHub** — sync, push/pull, collaborators |
+| `g` | **GitHub** — sync, push/pull, PRs, actions, collaborators |
 | `a` | **AI Mentor** — explain repo, ask questions, get recommendations |
 | `?` | **Help** — context-sensitive keybinding reference |
 | `q` | **Quit** |
@@ -132,6 +141,8 @@ api_key = "..."
 timeout_secs = 30
 ```
 
+> **Security**: GitHub tokens and AI API keys are automatically migrated from the config file to the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service) on first run. Plaintext values are removed from the config file after migration.
+
 ## Architecture
 
 ```
@@ -156,18 +167,30 @@ zit (Rust TUI)
 # Build
 cargo build
 
-# Run checks (format + clippy + test)
+# Run in debug mode
+cargo run
+
+# Run checks (format + clippy + test) — this is the CI gate
 make check
 
 # Run tests
-cargo test --all-targets        # 178 Rust tests
+cargo test --all-targets        # 178 Rust tests (143 unit + 35 integration)
 cd aws && python3 -m pytest tests/ -v   # 27 Lambda tests
+
+# Run a single test
+cargo test test_name
 
 # Lint
 cargo clippy --all-targets -- -D warnings
 
-# Release build
+# Format
+cargo fmt --all
+
+# Release build (stripped, LTO)
 cargo build --release
+
+# See all make targets
+make help
 ```
 
 ## Project Structure
