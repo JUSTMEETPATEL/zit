@@ -72,6 +72,7 @@ pub enum FollowUpAction {
     ApplyResolution(String), // file path
     StageFile(String),       // file path
     CommitNow,
+    SetCommitMessage(String),
     AbortMerge,
     ContinueMerge,
     ViewNextConflict,
@@ -1233,6 +1234,12 @@ impl App {
                 self.commit_state.refresh();
                 self.auto_suggest_if_ready();
             }
+            FollowUpAction::SetCommitMessage(msg) => {
+                self.commit_state.message = msg;
+                self.commit_state.validate();
+                self.view = View::Commit;
+                self.set_status("✓ AI commit message applied");
+            }
             FollowUpAction::AbortMerge => {
                 self.popup = Popup::Confirm {
                     title: "⚠ Abort Merge".to_string(),
@@ -1318,11 +1325,40 @@ impl App {
 
                     match action {
                         Some(AiAction::CommitSuggest) => {
-                            self.commit_state.message = response.trim().to_string();
-                            self.commit_state.validate();
-                            self.set_status(
-                                "✓ AI suggestion loaded — edit or press Enter to commit",
-                            );
+                            let mut suggestions = Vec::new();
+                            for line in response.lines() {
+                                if let Some(msg) = line.strip_prefix("[SUGGESTION] ") {
+                                    suggestions.push(FollowUpItem {
+                                        label: msg.trim().to_string(),
+                                        description: "Select this commit message".to_string(),
+                                        action: FollowUpAction::SetCommitMessage(
+                                            msg.trim().to_string(),
+                                        ),
+                                    });
+                                }
+                            }
+
+                            if suggestions.is_empty() {
+                                // Fallback if AI didn't follow the exact formatting
+                                suggestions.push(FollowUpItem {
+                                    label: "Use raw AI output".to_string(),
+                                    description: "AI didn't format correctly. Use full text."
+                                        .to_string(),
+                                    action: FollowUpAction::SetCommitMessage(
+                                        response.trim().to_string(),
+                                    ),
+                                });
+                            }
+
+                            self.popup = Popup::FollowUp {
+                                title: "🤖 Select Commit Message".to_string(),
+                                context: "Choose an AI-generated commit message:".to_string(),
+                                suggestions,
+                                selected: 0,
+                            };
+
+                            self.set_status("✓ AI suggestions ready — select one");
+
                             // Store in history
                             self.ai_mentor_state.add_history(
                                 "Commit Suggestion".to_string(),

@@ -66,7 +66,10 @@ Generate commit messages that are:
 - Descriptive but concise
 - Following conventional commits format when appropriate (feat:, fix:, docs:, etc.)
 
-Provide 2-3 suggestions, from most specific to most general."#;
+Provide 2-3 suggestions, from most specific to most general.
+Format your response EXACTLY by prefixing each suggestion with "[SUGGESTION] ". For example:
+[SUGGESTION] feat: add new login page
+[SUGGESTION] fix: resolve crash on startup"#;
 
 pub const PROMPT_LEARN: &str = r#"You are an expert Git teacher helping developers learn Git concepts.
 
