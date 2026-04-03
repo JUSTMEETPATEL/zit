@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles, FileSearch, MessageSquare, ShieldCheck, Stethoscope, Bot } from "lucide-react";
+import { Sparkles, FileSearch, MessageSquare, ShieldCheck, Stethoscope } from "lucide-react";
 import { useState } from "react";
 
 const capabilities = [
@@ -36,14 +36,6 @@ const capabilities = [
     title: "AI Commit Message",
     desc: "Press Ctrl+G in the commit editor — AI generates a commit message from your staged diff.",
     response: "feat(staging): add hunk-level diff preview with syntax highlighting\n\nImproves the interactive staging view to show colored diffs at the hunk level, making it easier to review changes before committing.",
-  },
-  {
-    id: "agent",
-    key: "A → Agent Mode",
-    icon: Bot,
-    title: "Agent Mode",
-    desc: "An autonomous chat interface where an AI agent plans and safely executes git commands for you.",
-    response: "I'll help you undo your last commit and push to a new branch. Here's my plan:\n1. run `git reset --soft HEAD~1`\n2. checkout new branch\n3. run `git push origin HEAD`\n\nShall I proceed?",
   },
 ];
 

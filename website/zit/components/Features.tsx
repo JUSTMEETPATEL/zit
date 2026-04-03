@@ -110,7 +110,7 @@ export default function Features() {
             transition={{ delay: 0.2 }}
             className="text-white/40 text-lg max-w-xl mx-auto"
           >
-            16 Git features. One binary. Zero GUI bloat.
+            14 Git features. One binary. Zero GUI bloat.
           </motion.p>
         </div>
 
@@ -145,7 +145,7 @@ export default function Features() {
           transition={{ delay: 0.4 }}
           className="mt-6 flex flex-wrap items-center justify-center gap-3"
         >
-          {["Commit Timeline", "Git Bisect", "Cherry Pick", "Workflow Builder", "Reflog Recovery", "Agent Mode", "Secret Scanning"].map((tag) => (
+          {["Commit Timeline", "Git Bisect", "Cherry Pick", "Workflow Builder", "Reflog Recovery"].map((tag) => (
             <span
               key={tag}
               className="px-3 py-1.5 rounded-full text-xs text-white/30 border border-white/5 glass font-mono"

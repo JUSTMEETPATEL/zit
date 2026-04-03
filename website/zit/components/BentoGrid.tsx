@@ -34,7 +34,7 @@ export default function BentoGrid() {
           Every Git Feature. <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500">Zero GUI Bloat.</span>
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto text-lg">
-          A terminal user interface that feels like a modern application. Unmatched speed, absolute control, and 16 powerful features built right in.
+          A terminal user interface that feels like a modern application. Unmatched speed, absolute control, and 14 powerful features built right in.
         </p>
       </div>
 

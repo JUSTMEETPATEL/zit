@@ -77,7 +77,6 @@ const sections = [
       { id: "feat-cherry", label: "Cherry Pick" },
       { id: "feat-workflow", label: "Workflow Builder" },
       { id: "feat-github", label: "GitHub Integration" },
-      { id: "feat-secret", label: "Secret Scanning" },
     ],
   },
   {
@@ -92,7 +91,6 @@ const sections = [
     icon: Bot,
     subsections: [
       { id: "ai-capabilities", label: "Capabilities" },
-      { id: "ai-agent", label: "Agent Mode" },
       { id: "ai-setup", label: "Setup" },
       { id: "ai-config", label: "Config File" },
       { id: "ai-env", label: "Environment Vars" },
@@ -608,7 +606,7 @@ export default function DocsLayout() {
             {/* Stats row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
               {[
-                { label: "Git Features", value: "16+", color: "text-orange-400", bg: "from-orange-500/10" },
+                { label: "Git Features", value: "14+", color: "text-orange-400", bg: "from-orange-500/10" },
                 { label: "Tests", value: "178", color: "text-emerald-400", bg: "from-emerald-500/10" },
                 { label: "Language", value: "Rust", color: "text-violet-400", bg: "from-violet-500/10" },
                 { label: "License", value: "MIT", color: "text-blue-400", bg: "from-blue-500/10" },
@@ -768,7 +766,7 @@ export default function DocsLayout() {
               <div className="flex-1 h-px bg-gradient-to-r from-white/8 to-transparent" />
             </div>
             <p className="text-white/40 text-sm mb-8">
-              zit ships with 16+ built-in Git features. Press the keybind from
+              zit ships with 14+ built-in Git features. Press the keybind from
               the dashboard to enter each view.
             </p>
 
@@ -972,20 +970,6 @@ export default function DocsLayout() {
                 "Add or remove collaborators",
               ]}
             />
-
-            <FeatureSection
-              id="feat-secret"
-              icon={AlertTriangle}
-              color="text-red-500"
-              title="Secret Scanning"
-              keybind="auto"
-              description="Built-in GitGuardian-style local engine blocks accidental commits of sensitive information."
-              details={[
-                "Scans staged files for hardcoded secrets before commit",
-                "Blocks the commit if a secret is found",
-                "Protects against leaking API keys, tokens, and passwords",
-              ]}
-            />
           </section>
 
           {/* ───────────── KEYBINDINGS ───────────── */}
@@ -1021,7 +1005,6 @@ export default function DocsLayout() {
                     { key: "w", action: "Workflow — build multi-step git workflows", color: "text-indigo-400" },
                     { key: "g", action: "GitHub — sync, push/pull, PRs, actions, collaborators", color: "text-indigo-400" },
                     { key: "a", action: "AI Mentor — explain repo, ask questions, get recommendations", color: "text-orange-400" },
-                    { key: "A", action: "Agent Mode — autonomous conversational Git operations", color: "text-purple-400" },
                     { key: "?", action: "Help — context-sensitive keybinding reference", color: "text-white/50" },
                     { key: "Ctrl+G", action: "Generate AI commit message (in Commit view)", color: "text-orange-400" },
                     { key: "q", action: "Quit", color: "text-white/30" },
@@ -1093,26 +1076,6 @@ export default function DocsLayout() {
                 </li>
               </ul>
             </div>
-
-            <SectionAnchor id="ai-agent" />
-            <h3 className="text-base font-bold text-white/80 mt-8 mb-3">Agent Mode (<Kbd>A</Kbd>)</h3>
-            <p className="text-white/45 text-sm mb-3 leading-relaxed">
-              Press <Kbd>A</Kbd> from the dashboard to enter a fully autonomous chat interface:
-            </p>
-            <ol className="space-y-3 mb-8">
-              <li className="flex gap-3 text-sm">
-                <span className="w-5 h-5 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs text-white/40 shrink-0 mt-0.5">1</span>
-                <span className="text-white/40">Type a natural language request (e.g., &quot;undo my last commit and push to a new branch&quot;)</span>
-              </li>
-              <li className="flex gap-3 text-sm">
-                <span className="w-5 h-5 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs text-white/40 shrink-0 mt-0.5">2</span>
-                <span className="text-white/40">The AI inspects the repo, plans the <code className="text-white/70 font-mono text-xs">git</code> commands, and asks for permission before running any destructive operations (like <code className="text-white/70 font-mono text-xs">--force</code>).</span>
-              </li>
-              <li className="flex gap-3 text-sm">
-                <span className="w-5 h-5 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs text-white/40 shrink-0 mt-0.5">3</span>
-                <span className="text-white/40">Read-only commands are executed automatically, and the AI uses the output to continue the loop until your task is done.</span>
-              </li>
-            </ol>
 
             <SectionAnchor id="ai-setup" />
             <h3 className="text-base font-bold text-white/80 mt-8 mb-3">Setup</h3>

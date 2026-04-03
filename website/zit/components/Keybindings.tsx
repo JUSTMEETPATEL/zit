@@ -17,7 +17,6 @@ const bindings = [
   { key: "w", label: "Workflow", color: "teal" },
   { key: "g", label: "GitHub", color: "slate" },
   { key: "a", label: "AI Mentor", color: "violet" },
-  { key: "A", label: "Agent Mode", color: "purple" },
   { key: "?", label: "Help", color: "neutral" },
   { key: "q", label: "Quit", color: "neutral" },
 ];
@@ -36,7 +35,6 @@ const descriptions: Record<string, string> = {
   w: "Visual workflow builder — compose and run multi-step git workflows.",
   g: "GitHub integration — OAuth, push/pull/sync, PRs, CI/CD actions.",
   a: "AI Mentor panel — explain repo, ask questions, get recommendations.",
-  A: "Agent Mode — autonomous conversational Git operations.",
   "?": "Context-sensitive help overlay — shows available keys for the current view.",
   q: "Exit zit gracefully.",
 };
