@@ -1,24 +1,27 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "zit - Your AI-Powered Git Assistant",
-  description: "zit is a terminal-based Git assistant that makes version control simple and intuitive. With interactive staging, guided commits, visual history, and an AI mentor that teaches you while you work, zit is the ultimate tool for mastering Git.",
+  title: "zit — AI-Powered Git Assistant for the Terminal",
+  description:
+    "zit is a Rust-powered TUI that replaces your entire Git workflow — interactive staging, visual branching, AI commit messages, conflict resolution, and an AI mentor built in. 14+ features, zero GUI bloat.",
   openGraph: {
-    title: "zit - Your AI-Powered Git Assistant",
+    title: "zit — AI-Powered Git Assistant for the Terminal",
     description:
-      "Terminal-based Git assistant with interactive staging, guided commits, visual history, and AI mentor.",
+      "Terminal-based Git assistant with 14+ features: interactive staging, guided commits, visual branching, AI mentor, GitHub integration, and more. Built in Rust.",
     url: "https://zitcli.com",
     siteName: "zit",
     type: "website",
@@ -26,9 +29,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "zit - Your AI-Powered Git Assistant",
+    title: "zit — AI-Powered Git Assistant for the Terminal",
     description:
-      "Terminal-based Git assistant with interactive staging, guided commits, visual history, and AI mentor.",
+      "14+ Git features. AI mentorship. Beautiful TUI. Built in Rust. Free & open source.",
   },
 };
 
@@ -38,12 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

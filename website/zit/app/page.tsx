@@ -1,28 +1,22 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import BentoGrid from "@/components/BentoGrid";
+import Features from "@/components/Features";
 import AiFeatures from "@/components/AiFeatures";
 import Installation from "@/components/Installation";
 import Keybindings from "@/components/Keybindings";
-import Configuration from "@/components/Configuration";
-import Development from "@/components/Development";
-import Architecture from "@/components/Architecture";
-import Troubleshooting from "@/components/Troubleshooting";
+import Cta from "@/components/Cta";
 import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
-    <main className="min-h-screen relative bg-[var(--background)] text-[var(--foreground)] overflow-x-hidden selection:bg-[var(--primary)] selection:text-white">
+    <main className="min-h-screen relative bg-[var(--background)] text-[var(--foreground)] overflow-x-hidden selection:bg-[var(--primary)]/30 selection:text-white">
       <Navbar />
       <Hero />
-      <BentoGrid />
+      <Features />
       <AiFeatures />
       <Installation />
       <Keybindings />
-      <Configuration />
-      <Architecture />
-      <Development />
-      <Troubleshooting />
+      <Cta />
       <Footer />
     </main>
   );

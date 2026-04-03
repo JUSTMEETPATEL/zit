@@ -1,133 +1,132 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  FolderTree,
-  Wrench,
-  CheckCircle2,
-} from "lucide-react";
+import { FolderTree, Wrench } from "lucide-react";
+
+const structure = [
+  { name: "src/main.rs", desc: "Entry point, terminal setup, render loop" },
+  { name: "src/app.rs", desc: "App state, view routing, AI dispatch" },
+  { name: "src/config.rs", desc: "Config loading (~/.config/zit/config.toml)" },
+  { name: "src/event.rs", desc: "Keyboard & tick event handling" },
+  { name: "src/keychain.rs", desc: "macOS Keychain integration" },
+  { name: "src/ai/", desc: "AI client, prompts, provider abstraction" },
+  { name: "src/git/", desc: "All git ops — runner, diff, log, branch…" },
+  { name: "src/ui/", desc: "14 TUI views + help overlay + utils" },
+  { name: "aws/", desc: "Lambda backend & SAM/CloudFormation infra" },
+  { name: "website/", desc: "Next.js marketing site (this page!)" },
+];
+
+const commands = [
+  { cmd: "cargo build", comment: "# Build debug binary" },
+  { cmd: "cargo run", comment: "# Run in debug mode" },
+  { cmd: "make check", comment: "# Format + clippy + test (CI gate)" },
+  { cmd: "cargo test --all-targets", comment: "# 178 Rust tests (143 unit + 35 integration)" },
+  { cmd: "cd aws && python3 -m pytest tests/ -v", comment: "# 27 Lambda tests" },
+  { cmd: "cargo clippy --all-targets -- -D warnings", comment: "# Lint" },
+  { cmd: "cargo fmt --all", comment: "# Format" },
+  { cmd: "cargo build --release", comment: "# Release build (stripped, LTO)" },
+  { cmd: "make help", comment: "# See all make targets" },
+];
 
 export default function Development() {
-  const structure = [
-    { name: "src/main.rs", desc: "Entry point, terminal setup" },
-    { name: "src/app.rs", desc: "App state, main loop" },
-    { name: "src/git/", desc: "Git command wrappers & parsing" },
-    { name: "src/ui/", desc: "TUI components & rendering" },
-    { name: "src/ai/", desc: "AI client & prompt engineering" },
-    { name: "src/config.rs", desc: "Configuration loading" },
-    { name: "src/event.rs", desc: "Keyboard & tick handling" },
-    { name: "aws/", desc: "Lambda backend & infrastructure" },
-    { name: "tests/", desc: "Integration test suite" },
-    { name: "website/", desc: "Next.js documentation site" },
-  ];
-
-  const commands = [
-    { cmd: "cargo build", desc: "Build" },
-    { cmd: "make check", desc: "Run checks (format + clippy + test)" },
-    { cmd: "cargo test --all-targets", desc: "13 Rust tests" },
-    {
-      cmd: "cd aws && python3 -m pytest tests/ -v",
-      desc: "27 Lambda tests",
-    },
-    { cmd: "cargo clippy --all-targets -- -D warnings", desc: "Lint" },
-    { cmd: "cargo build --release", desc: "Release build" },
-  ];
-
   return (
-    <section id="development" className="py-24 border-t border-white/5">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold mb-12 text-center">
-          Development & Structure
-        </h2>
+    <section id="development" className="py-24 border-t border-white/5 relative">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_100%,rgba(249,115,22,0.04),transparent)] pointer-events-none"></div>
 
-        <div className="grid md:grid-cols-2 gap-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center mb-14">
+          <h2 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight">
+            Development &{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">
+              Structure
+            </span>
+          </h2>
+          <p className="text-gray-400 text-lg max-w-xl mx-auto">
+            Built with Rust for reliability and performance. Contributions welcome!
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
           {/* Project Structure */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="bg-zinc-900/30 border border-white/5 rounded-xl p-8"
+            className="bg-[#0c0c0c] border border-white/10 rounded-2xl overflow-hidden"
           >
-            <div className="flex items-center gap-3 mb-6 text-xl font-bold text-white">
-              <FolderTree className="text-[var(--primary)]" />
-              <h3>Project Structure</h3>
+            <div className="bg-zinc-900 px-5 py-3.5 border-b border-white/5 flex items-center gap-2.5">
+              <FolderTree size={15} className="text-orange-400" />
+              <span className="text-sm font-semibold text-white">Project Structure</span>
             </div>
-            <ul className="space-y-4 font-mono text-sm">
-              {structure.map((item, i) => (
-                <li key={i} className="flex gap-4 items-start">
-                  <span className="text-gray-300 shrink-0">{item.name}</span>
-                  <span className="text-gray-600 border-b border-white/5 border-dashed flex-grow"></span>
-                  <span className="text-gray-500">{item.desc}</span>
-                </li>
-              ))}
-              <li className="mt-4 pt-4 border-t border-white/5 text-xs text-gray-500">
-                + more in <code className="text-gray-400">src/</code> and{" "}
-                <code className="text-gray-400">aws/</code>
-              </li>
-            </ul>
+            <div className="p-5">
+              <ul className="space-y-1 font-mono text-sm">
+                {structure.map((item, i) => (
+                  <motion.li
+                    key={i}
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.04 }}
+                    className="flex items-center gap-2 text-gray-400 hover:text-white group transition-colors py-1.5 px-2 rounded-lg hover:bg-white/3"
+                  >
+                    <span className="text-orange-500/50 text-xs select-none">›</span>
+                    <span className="text-gray-200 shrink-0 group-hover:text-orange-400 transition-colors">{item.name}</span>
+                    <span className="flex-1 border-b border-dashed border-white/5"></span>
+                    <span className="text-gray-600 text-xs text-right max-w-[160px] truncate">{item.desc}</span>
+                  </motion.li>
+                ))}
+              </ul>
+            </div>
           </motion.div>
 
-          {/* Workflow */}
+          {/* Dev commands */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="space-y-8"
+            className="bg-[#0c0c0c] border border-white/10 rounded-2xl overflow-hidden"
           >
-            <div>
-              <div className="flex items-center gap-3 mb-6 text-xl font-bold text-white">
-                <Wrench className="text-[var(--primary)]" />
-                <h3>Workflow</h3>
-              </div>
-              <div className="bg-black/40 rounded-lg border border-white/10 overflow-hidden font-mono text-sm">
-                {commands.map((c, i) => (
-                  <div
-                    key={i}
-                    className="group flex flex-col sm:flex-row sm:items-center border-b border-white/5 last:border-0 px-4 py-3 gap-2 sm:gap-4 hover:bg-white/5 transition-colors"
-                  >
-                    <div className="flex items-center flex-grow min-w-0">
-                      <span className="text-green-400 select-none mr-3 shrink-0">
-                        $
-                      </span>
-                      <code className="text-gray-200 break-all group-hover:text-white transition-colors">
-                        {c.cmd}
-                      </code>
-                    </div>
-                    <span className="text-xs text-gray-500 shrink-0 select-none group-hover:text-gray-400 transition-colors hidden sm:block">
-                      # {c.desc}
-                    </span>
-                    {/* Mobile description */}
-                    <span className="text-xs text-gray-500 select-none sm:hidden pl-6">
-                      # {c.desc}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <div className="bg-zinc-900 px-5 py-3.5 border-b border-white/5 flex items-center gap-2.5">
+              <Wrench size={15} className="text-orange-400" />
+              <span className="text-sm font-semibold text-white">Dev Workflow Commands</span>
             </div>
-
-            <div>
-              <div className="flex items-center gap-3 mb-4 text-xl font-bold text-white">
-                <CheckCircle2 className="text-[var(--primary)]" />
-                <h3>Prerequisites</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-white/5 rounded-lg text-center">
-                  <div className="text-white font-bold">Rust</div>
-                  <div className="text-xs text-gray-500">Toolchain</div>
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg text-center">
-                  <div className="text-white font-bold">Git</div>
-                  <div className="text-xs text-gray-500">CLI Installed</div>
-                </div>
-                <div className="p-3 bg-white/5 rounded-lg text-center col-span-2">
-                  <div className="text-white font-bold">C++ Build Tools</div>
-                  <div className="text-xs text-gray-500">
-                    Required for Windows users
+            <div className="divide-y divide-white/5 font-mono text-sm">
+              {commands.map((c, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05 }}
+                  className="group flex flex-col gap-0.5 px-5 py-3 hover:bg-white/3 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 select-none shrink-0">$</span>
+                    <code className="text-gray-200 group-hover:text-white transition-colors break-all">{c.cmd}</code>
                   </div>
-                </div>
-              </div>
+                  <span className="text-xs text-gray-600 pl-4 group-hover:text-gray-500 transition-colors">{c.comment}</span>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
+        </div>
+
+        {/* Prereqs row */}
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { name: "Rust", detail: "Stable toolchain (rustup)", color: "text-orange-400" },
+            { name: "Git", detail: "Any recent version", color: "text-green-400" },
+            { name: "Python 3.12", detail: "For Lambda tests", color: "text-blue-400" },
+            { name: "C++ Tools", detail: "Windows only", color: "text-gray-400" },
+          ].map((req) => (
+            <div
+              key={req.name}
+              className="p-4 bg-white/3 border border-white/5 rounded-xl text-center hover:border-white/10 transition-all"
+            >
+              <div className={`font-bold text-sm ${req.color} mb-0.5`}>{req.name}</div>
+              <div className="text-gray-600 text-xs">{req.detail}</div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
