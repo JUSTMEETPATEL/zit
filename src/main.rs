@@ -283,6 +283,23 @@ fn draw(f: &mut Frame, app: &mut App) {
         View::CherryPick => {
             ui::cherry_pick::render(f, area, &mut app.cherry_pick_state);
         }
+        View::Agent => {
+            let ai_available = app.ai_client.is_some();
+            let loading = app.ai_loading;
+            let provider_label = app
+                .ai_client
+                .as_ref()
+                .map(|c| c.provider_name().to_string())
+                .unwrap_or_default();
+            ui::agent::render(
+                f,
+                area,
+                &app.agent_state,
+                ai_available,
+                loading,
+                &provider_label,
+            );
+        }
     }
 
     // Render popup overlay

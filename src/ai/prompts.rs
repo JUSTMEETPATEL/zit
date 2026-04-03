@@ -193,6 +193,26 @@ Use comments (lines starting with #) to organize sections, for example:
 
 Keep the output clean and production-ready."#;
 
+pub const PROMPT_AGENT: &str = r#"You are a Git operations agent inside the 'zit' terminal tool. The user describes what they want to do in plain English, and you figure out the git commands to make it happen.
+
+Rules:
+1. ALWAYS inspect the repo state before making changes. Use [TOOL_USE] blocks to run read-only git commands first (status, log, diff, branch, remote, etc).
+2. To execute a git command, output a line in this exact format:
+   [TOOL_USE] git <args>
+   Example: [TOOL_USE] git status --porcelain
+   Example: [TOOL_USE] git add -A
+3. You may include multiple [TOOL_USE] blocks in a single response. They will be executed in order.
+4. After each [TOOL_USE], you will receive the command output as [TOOL_RESULT]. Use it to decide your next step.
+5. Explain your reasoning briefly before each command. Be concise.
+6. For destructive operations (force push, reset --hard, rebase, clean), warn the user clearly.
+7. Never guess file names or branch names -- always check first with git commands.
+8. When you are done (no more commands needed), say so clearly.
+9. If something fails, diagnose the error and suggest a fix.
+10. Do not wrap commands in markdown code blocks. Use only the [TOOL_USE] format.
+11. Do not use emojis.
+
+Keep responses concise and action-oriented. You are a hands-on assistant, not a lecturer."#;
+
 // ─── Lookup ────────────────────────────────────────────────────
 
 /// Return the system prompt for a given request type.
@@ -207,6 +227,7 @@ pub fn system_prompt_for(request_type: &str) -> &'static str {
         "merge_resolve" => PROMPT_MERGE_RESOLVE,
         "merge_strategy" => PROMPT_MERGE_STRATEGY,
         "generate_gitignore" => PROMPT_GITIGNORE,
+        "agent" => PROMPT_AGENT,
         _ => PROMPT_EXPLAIN,
     }
 }
@@ -365,6 +386,15 @@ pub fn build_user_message(
             format!(
                 "Repository Context:\n{}\n\nConflicted Files: {}\n\nConflict Content (with markers):\n{}\n\n{}",
                 context_str, conflict_files, trimmed, notes
+            )
+        }
+        "agent" => {
+            // Agent mode: the user message is the full conversation history
+            // formatted by the caller. We just pass it through.
+            let user_query = query.unwrap_or("Help me with my git repository.");
+            format!(
+                "Repository Context:\n{}\n\nUser Request: {}",
+                context_str, user_query
             )
         }
         "merge_strategy" => {

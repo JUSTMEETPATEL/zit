@@ -6,8 +6,8 @@ use crate::ai::client::AiClient;
 use crate::config::Config;
 use crate::git;
 use crate::ui::{
-    ai_mentor, bisect, branches, cherry_pick, commit, dashboard, github, merge_resolve, reflog,
-    staging, stash, time_travel, timeline, workflow_builder,
+    agent, ai_mentor, bisect, branches, cherry_pick, commit, dashboard, github, merge_resolve,
+    reflog, staging, stash, time_travel, timeline, workflow_builder,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -26,6 +26,7 @@ pub enum View {
     WorkflowBuilder,
     Bisect,
     CherryPick,
+    Agent,
 }
 
 /// Popup dialog state.
@@ -145,6 +146,7 @@ pub enum AiAction {
     MergeStrategy,
     ResetSuggest,
     GenerateGitignore,
+    AgentChat,
 }
 
 pub struct App {
@@ -176,6 +178,7 @@ pub struct App {
     pub workflow_builder_state: workflow_builder::WorkflowBuilderState,
     pub bisect_state: bisect::BisectState,
     pub cherry_pick_state: cherry_pick::CherryPickState,
+    pub agent_state: agent::AgentState,
 }
 
 impl App {
@@ -216,6 +219,7 @@ impl App {
             workflow_builder_state: workflow_builder::WorkflowBuilderState::new(),
             bisect_state: bisect::BisectState::default(),
             cherry_pick_state: cherry_pick::CherryPickState::default(),
+            agent_state: agent::AgentState::default(),
         }
     }
 
@@ -236,6 +240,7 @@ impl App {
             View::WorkflowBuilder => {} // no auto-refresh
             View::Bisect => self.bisect_state.refresh(),
             View::CherryPick => self.cherry_pick_state.refresh(),
+            View::Agent => {} // no auto-refresh for agent
         }
     }
 
@@ -520,6 +525,13 @@ impl App {
                     self.cherry_pick_state.refresh();
                     return Ok(());
                 }
+                KeyCode::Char('A') => {
+                    self.view = View::Agent;
+                    if self.ai_client.is_none() {
+                        self.start_ai_setup();
+                    }
+                    return Ok(());
+                }
                 _ => {}
             }
         }
@@ -540,6 +552,7 @@ impl App {
             View::WorkflowBuilder => workflow_builder::handle_key(self, key)?,
             View::Bisect => bisect::handle_key(self, key)?,
             View::CherryPick => cherry_pick::handle_key(self, key)?,
+            View::Agent => agent::handle_key(self, key)?,
         }
 
         Ok(())
@@ -1343,6 +1356,189 @@ impl App {
         });
     }
 
+    // ── Agent Mode ─────────────────────────────────────────────
+
+    /// Start an async AI agent chat — non-blocking.
+    pub fn start_agent_chat(&mut self) {
+        if self.ai_loading {
+            self.set_status("AI is already processing...");
+            return;
+        }
+        let client = match self.ai_client {
+            Some(ref c) => Arc::clone(c),
+            None => {
+                self.set_status("AI not configured. Set [ai] in ~/.config/zit/config.toml or export ZIT_AI_API_KEY + ZIT_AI_ENDPOINT");
+                return;
+            }
+        };
+
+        self.ai_loading = true;
+        self.agent_state.thinking = true;
+        self.ai_action = Some(AiAction::AgentChat);
+
+        // Build the user message from conversation history
+        let user_message = self.build_agent_user_message();
+
+        let (tx, rx) = mpsc::channel();
+        self.ai_receiver = Some(rx);
+
+        std::thread::spawn(move || {
+            let result = client.agent_chat(&user_message).map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
+    }
+
+    /// Build a summary of the conversation for the AI context window.
+    fn build_agent_user_message(&self) -> String {
+        let mut parts = Vec::new();
+
+        // Include recent conversation history (last 20 messages for token budget)
+        let messages = &self.agent_state.messages;
+        let start = if messages.len() > 20 {
+            messages.len() - 20
+        } else {
+            0
+        };
+
+        for msg in &messages[start..] {
+            match &msg.role {
+                agent::MessageRole::User => {
+                    parts.push(format!("User: {}", msg.content));
+                }
+                agent::MessageRole::Agent => {
+                    parts.push(format!("Agent: {}", msg.content));
+                }
+                agent::MessageRole::ToolUse {
+                    command,
+                    output,
+                    success,
+                } => {
+                    let status = if *success { "OK" } else { "FAILED" };
+                    parts.push(format!(
+                        "[TOOL_RESULT] git {} ({})\n{}",
+                        command, status, output
+                    ));
+                }
+                agent::MessageRole::System => {
+                    // skip system messages in AI context
+                }
+                agent::MessageRole::Permission { command, approved } => {
+                    match approved {
+                        Some(true) => parts.push(format!("[APPROVED] git {}", command)),
+                        Some(false) => {
+                            parts.push(format!("[DENIED] git {} -- user denied this command, suggest alternative", command));
+                        }
+                        None => {}
+                    }
+                }
+            }
+        }
+
+        parts.join("\n\n")
+    }
+
+    /// Execute a git command from the agent's tool-use request.
+    pub fn execute_agent_command(&mut self, args: Vec<String>) {
+        let cmd_str = args.join(" ");
+        self.agent_state.executing_label = Some(format!("git {}", cmd_str));
+
+        let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        let (output, success) = match git::run_git(&args_str) {
+            Ok(out) => (out, true),
+            Err(e) => (e.to_string(), false),
+        };
+
+        self.agent_state.executing_label = None;
+
+        // Add tool-use result to conversation
+        self.agent_state.messages.push(agent::AgentMessage {
+            role: agent::MessageRole::ToolUse {
+                command: cmd_str,
+                output: output.clone(),
+                success,
+            },
+            content: String::new(),
+        });
+
+        // Process next pending tool use or continue the agent loop
+        self.process_agent_next_tool();
+    }
+
+    /// Process the next tool-use in the queue, or re-send to AI if queue is empty.
+    pub fn process_agent_next_tool(&mut self) {
+        // If there are more tool uses queued, process the next one
+        if !self.agent_state.pending_tool_uses.is_empty() {
+            let (_description, args) = self.agent_state.pending_tool_uses.remove(0);
+
+            // Check if it's safe to auto-execute
+            if self.agent_state.auto_approve || agent::is_safe_command(&args) {
+                self.execute_agent_command(args);
+            } else {
+                let is_destructive = agent::is_destructive_command(&args);
+                self.agent_state.pending_command = Some(agent::PendingCommand {
+                    command: args,
+                    description: _description,
+                    is_destructive,
+                });
+            }
+            return;
+        }
+
+        // No more tool uses — flush any remaining agent text
+        if let Some(text) = self.agent_state.pending_agent_text.take() {
+            let trimmed = text.trim().to_string();
+            if !trimmed.is_empty() {
+                self.agent_state.messages.push(agent::AgentMessage {
+                    role: agent::MessageRole::Agent,
+                    content: trimmed,
+                });
+            }
+        }
+
+        // Re-send to AI with updated context (the tool results)
+        // Only if the last message was a tool result (agent loop continues)
+        let should_continue = self
+            .agent_state
+            .messages
+            .last()
+            .map(|m| matches!(m.role, agent::MessageRole::ToolUse { .. }))
+            .unwrap_or(false);
+
+        if should_continue {
+            self.start_agent_chat();
+        }
+    }
+
+    /// Parse [TOOL_USE] blocks from an AI agent response.
+    /// Returns the text parts and tool-use requests separately.
+    fn parse_agent_response(response: &str) -> (String, Vec<(String, Vec<String>)>) {
+        let mut text_parts = Vec::new();
+        let mut tool_uses = Vec::new();
+
+        for line in response.lines() {
+            let trimmed = line.trim();
+            if let Some(cmd) = trimmed.strip_prefix("[TOOL_USE]") {
+                let cmd = cmd.trim();
+                // Parse "git <args>"
+                if let Some(git_args) = cmd.strip_prefix("git ") {
+                    let args: Vec<String> = git_args
+                        .split_whitespace()
+                        .map(|s| s.to_string())
+                        .collect();
+                    if !args.is_empty() {
+                        // Use the preceding text as the description
+                        let desc = text_parts.last().cloned().unwrap_or_default();
+                        tool_uses.push((desc, args));
+                    }
+                }
+            } else {
+                text_parts.push(line.to_string());
+            }
+        }
+
+        (text_parts.join("\n"), tool_uses)
+    }
+
     /// Execute a follow-up action from the suggestion list.
     pub fn execute_follow_up(&mut self, action: FollowUpAction) {
         match action {
@@ -1665,6 +1861,38 @@ impl App {
                             self.ai_mentor_state
                                 .add_history("Generate .gitignore".to_string(), clean);
                         }
+                        Some(AiAction::AgentChat) => {
+                            self.agent_state.thinking = false;
+
+                            // Parse the response for text + tool-use blocks
+                            let (text, tool_uses) = Self::parse_agent_response(&response);
+
+                            if tool_uses.is_empty() {
+                                // No tool uses — just render agent text
+                                let trimmed = text.trim().to_string();
+                                if !trimmed.is_empty() {
+                                    self.agent_state.messages.push(agent::AgentMessage {
+                                        role: agent::MessageRole::Agent,
+                                        content: trimmed,
+                                    });
+                                }
+                            } else {
+                                // Store agent text before tool uses
+                                let trimmed = text.trim().to_string();
+                                if !trimmed.is_empty() {
+                                    self.agent_state.messages.push(agent::AgentMessage {
+                                        role: agent::MessageRole::Agent,
+                                        content: trimmed,
+                                    });
+                                }
+
+                                // Queue all tool uses
+                                self.agent_state.pending_tool_uses = tool_uses;
+
+                                // Process the first one
+                                self.process_agent_next_tool();
+                            }
+                        }
                         None => {
                             self.set_status(format!("AI: {}", response));
                         }
@@ -1676,6 +1904,14 @@ impl App {
                         self.ai_action,
                         e
                     );
+                    // Reset agent thinking state on error
+                    if matches!(self.ai_action, Some(AiAction::AgentChat)) {
+                        self.agent_state.thinking = false;
+                        self.agent_state.messages.push(agent::AgentMessage {
+                            role: agent::MessageRole::System,
+                            content: format!("Error: {}", e),
+                        });
+                    }
                     self.set_status(format!("AI error: {}", e));
                     self.ai_loading = false;
                     self.ai_receiver = None;

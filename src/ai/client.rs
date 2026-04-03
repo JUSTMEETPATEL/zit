@@ -632,6 +632,25 @@ impl AiClient {
     pub fn is_configured(&self) -> bool {
         !self.provider_kind.is_empty()
     }
+
+    /// Agent mode: send a user message with full conversation context.
+    /// The `user_message` should contain the formatted conversation history
+    /// and the latest user intent.
+    pub fn agent_chat(&self, user_message: &str) -> Result<String> {
+        let ctx = build_repo_context(false)?;
+        let request = MentorRequest {
+            request_type: "agent".to_string(),
+            context: Some(ctx),
+            query: Some(user_message.to_string()),
+            error: None,
+        };
+        // Don't use the cached call — agent responses should never be cached
+        if self.provider_kind == "bedrock" {
+            self.call_bedrock(&request)
+        } else {
+            self.call_direct(&request)
+        }
+    }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────

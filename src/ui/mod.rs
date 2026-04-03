@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod ai_mentor;
 pub mod bisect;
 pub mod branches;

@@ -31,6 +31,7 @@ pub fn render(f: &mut Frame, area: Rect, current_view: View) {
             ("w", "Open Workflow Builder"),
             ("B", "Open Bisect view"),
             ("p", "Open Cherry Pick view"),
+            ("A", "Open Agent Mode"),
             ("?", "Toggle this help"),
             ("q", "Quit"),
             ("Ctrl+C", "Force quit"),
@@ -170,6 +171,18 @@ pub fn render(f: &mut Frame, area: Rect, current_view: View) {
             ("Esc", "Back to branch select"),
             ("q", "Back to Dashboard"),
         ],
+        View::Agent => vec![
+            ("i", "Start typing"),
+            ("Enter", "Send message"),
+            ("y", "Allow pending command"),
+            ("n", "Deny pending command"),
+            ("a", "Auto-approve all (session)"),
+            ("↑/↓ or j/k", "Scroll conversation"),
+            ("Ctrl+L", "Clear conversation"),
+            ("Ctrl+C", "Cancel AI request"),
+            ("Esc", "Exit input / Back"),
+            ("q", "Back to Dashboard"),
+        ],
     };
 
     let view_name = match current_view {
@@ -187,6 +200,7 @@ pub fn render(f: &mut Frame, area: Rect, current_view: View) {
         View::WorkflowBuilder => "Workflow Builder",
         View::Bisect => "Bisect",
         View::CherryPick => "Cherry Pick",
+        View::Agent => "Agent",
     };
 
     let mut lines = vec![
