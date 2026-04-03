@@ -12,6 +12,8 @@ pub struct Config {
     pub ui: UiConfig,
     #[serde(default)]
     pub ai: AiConfig,
+    #[serde(default)]
+    pub secrets: SecretsConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -81,6 +83,37 @@ impl Default for UiConfig {
         Self {
             color_scheme: default_color_scheme(),
             show_help_hints: true,
+        }
+    }
+}
+
+/// Configuration for the built-in secret scanner.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SecretsConfig {
+    /// Enable/disable secret scanning on stage and commit (default: true).
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Patterns to allowlist — matching findings will be skipped.
+    /// Can be file names, rule names, or partial secret previews.
+    #[serde(default)]
+    pub allowlist: Vec<String>,
+    /// Additional custom regex patterns to scan for.
+    #[serde(default)]
+    pub custom_patterns: Vec<CustomSecretPattern>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CustomSecretPattern {
+    pub name: String,
+    pub pattern: String,
+}
+
+impl Default for SecretsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            allowlist: Vec::new(),
+            custom_patterns: Vec::new(),
         }
     }
 }

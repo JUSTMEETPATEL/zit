@@ -365,6 +365,25 @@ fn do_commit(app: &mut crate::app::App) -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // ── Secret scanning before commit ───────────────────────────────
+    if app.config.secrets.enabled {
+        let rules = git::secrets::default_rules();
+        let findings = git::secrets::scan_staged_files(
+            &app.commit_state.staged_files,
+            &rules,
+            &app.config.secrets.allowlist,
+        );
+
+        if !findings.is_empty() {
+            app.popup = crate::app::Popup::SecretWarning {
+                findings,
+                pending_action: crate::app::SecretPendingAction::Commit,
+                selected: 0,
+            };
+            return Ok(());
+        }
+    }
+
     let msg = app.commit_state.message.trim().to_string();
     match git::run_git(&["commit", "-m", &msg]) {
         Ok(output) => {

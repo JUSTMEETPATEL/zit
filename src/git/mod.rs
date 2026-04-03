@@ -8,6 +8,7 @@ pub mod merge;
 pub mod reflog;
 pub mod remote;
 pub mod runner;
+pub mod secrets;
 pub mod stash;
 pub mod status;
 
@@ -18,4 +19,5 @@ pub use merge::MergeState;
 pub use reflog::ReflogEntry;
 pub use remote::RemoteOps;
 pub use runner::run_git;
+pub use secrets::SecretFinding;
 pub use status::{FileEntry, FileStatus};

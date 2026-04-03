@@ -266,6 +266,14 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
     let mut ai_error: Option<String> = None;
     let mut ai_review: Option<(String, String)> = None; // (file_path, diff_content)
 
+    // Deferred stage actions (collected inside borrow, executed after release)
+    enum DeferredStage {
+        None,
+        ScanFile(String),
+        ScanAll(Vec<String>),
+    }
+    let mut deferred_stage = DeferredStage::None;
+
     {
         let state = &mut app.staging_state;
 
@@ -346,42 +354,34 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
                 KeyCode::Char(' ') => {
                     // Toggle stage/unstage
                     if let Some(file) = state.files.get(state.selected).cloned() {
-                        let result = if file.is_staged {
-                            git::run_git(&["restore", "--staged", &file.path])
+                        if file.is_staged {
+                            // Unstaging — no secret scanning needed
+                            let result = git::run_git(&["restore", "--staged", &file.path]);
+                            if let Err(e) = result {
+                                let err_str = e.to_string();
+                                status_msg = Some(format!("Error: {}", err_str));
+                                ai_error = Some(err_str);
+                            }
+                            state.refresh();
                         } else {
-                            git::run_git(&["add", &file.path])
-                        };
-                        if let Err(e) = result {
-                            let err_str = e.to_string();
-                            status_msg = Some(format!("Error: {}", err_str));
-                            ai_error = Some(err_str);
+                            // Defer to scan-then-stage after borrow released
+                            deferred_stage = DeferredStage::ScanFile(file.path.clone());
                         }
-                        state.refresh();
                     }
                 }
                 KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    // Stage all
-                    match git::run_git(&["add", "-A"]) {
-                        Ok(_) => status_msg = Some("All files staged".to_string()),
-                        Err(e) => {
-                            let err_str = e.to_string();
-                            status_msg = Some(format!("Failed to stage: {}", err_str));
-                            ai_error = Some(err_str);
-                        }
-                    }
-                    state.refresh();
+                    // Stage all — collect unstaged paths for deferred scanning
+                    let paths: Vec<String> = state
+                        .files.iter().filter(|f| !f.is_staged)
+                        .map(|f| f.path.clone()).collect();
+                    deferred_stage = DeferredStage::ScanAll(paths);
                 }
                 KeyCode::Char('A') => {
                     // Mac-friendly alternative for Ctrl+A (stage all)
-                    match git::run_git(&["add", "-A"]) {
-                        Ok(_) => status_msg = Some("All files staged".to_string()),
-                        Err(e) => {
-                            let err_str = e.to_string();
-                            status_msg = Some(format!("Failed to stage: {}", err_str));
-                            ai_error = Some(err_str);
-                        }
-                    }
-                    state.refresh();
+                    let paths: Vec<String> = state
+                        .files.iter().filter(|f| !f.is_staged)
+                        .map(|f| f.path.clone()).collect();
+                    deferred_stage = DeferredStage::ScanAll(paths);
                 }
                 KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     // AI diff review for selected file
@@ -454,6 +454,79 @@ pub fn handle_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()
             }
         } // close else block for non-hunk mode
     } // release mutable borrow of staging_state
+
+    // ── Deferred secret scanning & staging ───────────────────────────
+    match deferred_stage {
+        DeferredStage::ScanFile(path) => {
+            if app.config.secrets.enabled && !git::secrets::is_binary(&path) {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    let rules = git::secrets::default_rules();
+                    let findings = git::secrets::scan_content(&path, &content, &rules);
+                    let findings: Vec<_> = findings
+                        .into_iter()
+                        .filter(|f| {
+                            !app.config.secrets.allowlist.iter().any(|a| {
+                                f.preview.contains(a)
+                                    || f.file.contains(a)
+                                    || f.rule_name.contains(a)
+                            })
+                        })
+                        .collect();
+                    if !findings.is_empty() {
+                        app.popup = crate::app::Popup::SecretWarning {
+                            findings,
+                            pending_action: crate::app::SecretPendingAction::StageFile(path),
+                            selected: 0,
+                        };
+                        return Ok(());
+                    }
+                }
+            }
+            // No secrets or scanning disabled — stage normally
+            if let Err(e) = git::run_git(&["add", &path]) {
+                let err_str = e.to_string();
+                status_msg = Some(format!("Error: {}", err_str));
+                ai_error = Some(err_str);
+            }
+            app.staging_state.refresh();
+        }
+        DeferredStage::ScanAll(paths) => {
+            if app.config.secrets.enabled {
+                let rules = git::secrets::default_rules();
+                let mut all_findings = Vec::new();
+                for p in &paths {
+                    if git::secrets::is_binary(p) { continue; }
+                    if let Ok(content) = std::fs::read_to_string(p) {
+                        all_findings.extend(git::secrets::scan_content(p, &content, &rules));
+                    }
+                }
+                all_findings.retain(|f| {
+                    !app.config.secrets.allowlist.iter().any(|a| {
+                        f.preview.contains(a) || f.file.contains(a) || f.rule_name.contains(a)
+                    })
+                });
+                if !all_findings.is_empty() {
+                    app.popup = crate::app::Popup::SecretWarning {
+                        findings: all_findings,
+                        pending_action: crate::app::SecretPendingAction::StageAll,
+                        selected: 0,
+                    };
+                    return Ok(());
+                }
+            }
+            // No secrets — stage all
+            match git::run_git(&["add", "-A"]) {
+                Ok(_) => status_msg = Some("All files staged".to_string()),
+                Err(e) => {
+                    let err_str = e.to_string();
+                    status_msg = Some(format!("Failed to stage: {}", err_str));
+                    ai_error = Some(err_str);
+                }
+            }
+            app.staging_state.refresh();
+        }
+        DeferredStage::None => {}
+    }
 
     // Handle actions that need full App access (no staging_state borrow)
     match key.code {

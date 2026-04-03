@@ -55,6 +55,11 @@ pub enum Popup {
         suggestions: Vec<FollowUpItem>,
         selected: usize,
     },
+    SecretWarning {
+        findings: Vec<git::SecretFinding>,
+        pending_action: SecretPendingAction,
+        selected: usize,
+    },
 }
 
 /// A follow-up suggestion item shown after AI responses.
@@ -84,6 +89,14 @@ pub enum FollowUpAction {
     WriteGitignore(String), // generated .gitignore content
 }
 
+/// Describes the git action that was pending when secrets were detected.
+#[derive(Debug, Clone)]
+pub enum SecretPendingAction {
+    StageFile(String),  // single file path
+    StageAll,           // stage all files
+    Commit,             // commit with current message
+}
+
 #[derive(Debug, Clone)]
 pub enum ConfirmAction {
     DeleteBranch(String),
@@ -97,6 +110,8 @@ pub enum ConfirmAction {
     MergePullRequest { number: u64, method: String },
     ClosePullRequest(u64),
     DiscardFile(String),
+    ForceStageWithSecrets(SecretPendingAction),
+    ForceCommitWithSecrets,
 }
 
 #[derive(Debug, Clone)]
@@ -335,6 +350,77 @@ impl App {
                             let action = suggestions[idx].action.clone();
                             self.popup = Popup::None;
                             self.execute_follow_up(action);
+                        }
+                    }
+                    _ => {}
+                }
+                return Ok(());
+            }
+            Popup::SecretWarning {
+                findings,
+                pending_action,
+                selected,
+            } => {
+                let pending = pending_action.clone();
+                let count = findings.len();
+                let sel = *selected;
+                match key.code {
+                    KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('n') => {
+                        self.popup = Popup::None;
+                        self.set_status("🛡 Secret scan: operation cancelled");
+                    }
+                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                        // Force proceed — show confirmation
+                        self.popup = Popup::Confirm {
+                            title: "⚠ Force Proceed with Secrets".to_string(),
+                            message: format!(
+                                "Found {} potential secret(s). Are you sure you want to proceed? (y/n)",
+                                count
+                            ),
+                            on_confirm: match pending {
+                                SecretPendingAction::Commit => ConfirmAction::ForceCommitWithSecrets,
+                                _ => ConfirmAction::ForceStageWithSecrets(pending),
+                            },
+                        };
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if let Popup::SecretWarning {
+                            ref mut selected, ..
+                        } = self.popup
+                        {
+                            if *selected > 0 {
+                                *selected -= 1;
+                            }
+                        }
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if let Popup::SecretWarning {
+                            ref mut selected,
+                            ref findings,
+                            ..
+                        } = self.popup
+                        {
+                            if *selected + 1 < findings.len() {
+                                *selected += 1;
+                            }
+                        }
+                    }
+                    KeyCode::Char('a') => {
+                        // Add the selected finding's file to allowlist
+                        if sel < count {
+                            if let Popup::SecretWarning { ref findings, .. } = self.popup {
+                                let finding = &findings[sel];
+                                let pattern = finding.file.clone();
+                                if !self.config.secrets.allowlist.contains(&pattern) {
+                                    self.config.secrets.allowlist.push(pattern.clone());
+                                    let _ = self.config.save();
+                                    self.set_status(format!(
+                                        "✓ Added '{}' to secret allowlist",
+                                        pattern
+                                    ));
+                                }
+                            }
+                            self.popup = Popup::None;
                         }
                     }
                     _ => {}
@@ -619,6 +705,54 @@ impl App {
                                 self.start_ai_error_explain(err_str);
                             }
                         }
+                    }
+                }
+            }
+            ConfirmAction::ForceStageWithSecrets(pending_action) => {
+                match pending_action {
+                    SecretPendingAction::StageFile(path) => {
+                        match git::run_git(&["add", &path]) {
+                            Ok(_) => {
+                                self.set_status(format!("⚠ Staged with secrets: {}", path));
+                            }
+                            Err(e) => {
+                                self.set_status(format!("Error staging: {}", e));
+                            }
+                        }
+                        self.staging_state.refresh();
+                    }
+                    SecretPendingAction::StageAll => {
+                        match git::run_git(&["add", "-A"]) {
+                            Ok(_) => {
+                                self.set_status("⚠ All files staged (secrets warning overridden)");
+                            }
+                            Err(e) => {
+                                self.set_status(format!("Failed to stage: {}", e));
+                            }
+                        }
+                        self.staging_state.refresh();
+                    }
+                    SecretPendingAction::Commit => {
+                        // Shouldn't reach here, but handle gracefully
+                        self.set_status("Use ForceCommitWithSecrets for commits");
+                    }
+                }
+            }
+            ConfirmAction::ForceCommitWithSecrets => {
+                let msg = self.commit_state.message.trim().to_string();
+                match git::run_git(&["commit", "-m", &msg]) {
+                    Ok(output) => {
+                        self.set_status(format!(
+                            "⚠ {}",
+                            output.lines().next().unwrap_or("Committed (secrets warning overridden)")
+                        ));
+                        self.commit_state.message.clear();
+                        self.commit_state.editing = true;
+                        self.view = View::Dashboard;
+                        self.dashboard_state.refresh();
+                    }
+                    Err(e) => {
+                        self.set_status(format!("Commit failed: {}", e));
                     }
                 }
             }

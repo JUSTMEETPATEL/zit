@@ -371,6 +371,81 @@ fn draw(f: &mut Frame, app: &mut App) {
 
             f.render_widget(popup, popup_area);
         }
+        Popup::SecretWarning {
+            findings,
+            pending_action: _,
+            selected,
+        } => {
+            let popup_area = ui::utils::centered_rect(70, 60, area);
+            f.render_widget(Clear, popup_area);
+
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  🛡 Potential secrets detected!",
+                    Style::default()
+                        .fg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(Span::styled(
+                    "  The following sensitive data was found:",
+                    Style::default().fg(Color::Yellow),
+                )),
+                Line::from(""),
+            ];
+
+            for (i, finding) in findings.iter().enumerate() {
+                let is_sel = i == *selected;
+                let prefix = if is_sel { "  ▶ " } else { "    " };
+                let style = if is_sel {
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::Gray)
+                };
+
+                lines.push(Line::from(vec![
+                    Span::styled(prefix, Style::default().fg(Color::Red)),
+                    Span::styled(&finding.rule_name, style),
+                ]));
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        "       {}:{} — {}",
+                        finding.file, finding.line, finding.preview
+                    ),
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled(" Esc", Style::default().fg(Color::Green)),
+                Span::raw(" Abort  "),
+                Span::styled("f", Style::default().fg(Color::Red)),
+                Span::raw(" Force  "),
+                Span::styled("a", Style::default().fg(Color::Yellow)),
+                Span::raw(" Allowlist  "),
+                Span::styled("j/k", Style::default().fg(Color::Cyan)),
+                Span::raw(" Navigate"),
+            ]));
+
+            let popup = Paragraph::new(lines)
+                .block(
+                    Block::default()
+                        .title(Span::styled(
+                            " 🛡 Secret Scanner ",
+                            Style::default()
+                                .fg(Color::Red)
+                                .add_modifier(Modifier::BOLD),
+                        ))
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Red)),
+                )
+                .wrap(Wrap { trim: false });
+
+            f.render_widget(popup, popup_area);
+        }
         Popup::None => {}
     }
 }
