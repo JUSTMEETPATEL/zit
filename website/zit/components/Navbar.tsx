@@ -10,6 +10,7 @@ const navLinks = [
   { name: "AI Mentor", href: "#ai-mentor" },
   { name: "Install", href: "#installation" },
   { name: "Keybindings", href: "#keybindings" },
+  { name: "Docs", href: "/docs" },
 ];
 
 export default function Navbar() {
