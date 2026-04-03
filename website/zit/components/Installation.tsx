@@ -4,90 +4,135 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 
+type OS = "brew" | "cargo";
+
 export default function Installation() {
   const [copied, setCopied] = useState("");
-  const [os, setOs] = useState<"brew" | "cargo">("brew");
+  const [os, setOs] = useState<OS>("brew");
 
-  const commands = {
-    brew: `brew tap JUSTMEETPATEL/zit
-brew install zit`,
-    cargo: `cargo install --git https://github.com/JUSTMEETPATEL/zit`,
+  const commands: Record<OS, { lines: string[]; hint: string }> = {
+    brew: {
+      lines: ["brew tap JUSTMEETPATEL/zit", "brew install zit"],
+      hint: "Recommended for macOS. Auto-updates with brew upgrade.",
+    },
+    cargo: {
+      lines: ["cargo install --git https://github.com/JUSTMEETPATEL/zit"],
+      hint: "Requires Rust toolchain. Works on macOS, Linux, Windows.",
+    },
   };
 
-  const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = (key: string) => {
+    navigator.clipboard.writeText(commands[key as OS].lines.join("\n"));
     setCopied(key);
     setTimeout(() => setCopied(""), 2000);
   };
 
   return (
-    <section
-      id="installation"
-      className="py-24 bg-zinc-900/30 border-y border-white/5"
-    >
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-8 text-white">
-          Install using your favorite package manager
-        </h2>
+    <section id="installation" className="py-32 relative">
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-orange-500/5 blur-[100px] rounded-full pointer-events-none" />
 
-        <div className="flex justify-center gap-4 mb-8">
-          <button
-            onClick={() => setOs("brew")}
-            className={`px-6 py-2 rounded-full font-medium transition-all ${
-              os === "brew"
-                ? "bg-white text-black"
-                : "bg-white/5 text-gray-400 hover:bg-white/10"
-            }`}
+      <div className="max-w-4xl mx-auto px-6 relative z-10">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="text-sm font-semibold text-orange-400 tracking-widest uppercase mb-4"
           >
-            Homebrew (macOS)
-          </button>
-          <button
-            onClick={() => setOs("cargo")}
-            className={`px-6 py-2 rounded-full font-medium transition-all ${
-              os === "cargo"
-                ? "bg-[var(--primary)] text-white"
-                : "bg-white/5 text-gray-400 hover:bg-white/10"
-            }`}
+            Install
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-4xl md:text-5xl font-black tracking-tight mb-5"
           >
-            Source (Linux/macOS/Windows)
-          </button>
+            Up and running{" "}
+            <span className="text-orange">in 30 seconds.</span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className="text-white/40 text-lg"
+          >
+            No configuration required. Works on macOS, Linux, and Windows.
+          </motion.p>
         </div>
 
-        <div className="relative max-w-2xl mx-auto">
+        {/* Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex gap-2 mb-4 justify-center">
+            {(["brew", "cargo"] as OS[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setOs(key)}
+                className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
+                  os === key
+                    ? "bg-orange-500 text-black shadow-[0_0_20px_rgba(249,115,22,0.3)]"
+                    : "glass text-white/40 hover:text-white/70"
+                }`}
+              >
+                {key === "brew" ? "🍺 Homebrew" : "📦 Cargo"}
+              </button>
+            ))}
+          </div>
+
+          {/* Terminal block */}
           <motion.div
             key={os}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-black/80 rounded-xl p-6 border border-white/10 text-left relative group"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative group"
           >
-            <pre className="font-mono text-gray-300 overflow-x-auto">
-              <code>{commands[os]}</code>
-            </pre>
-            <button
-              onClick={() => handleCopy(commands[os], os)}
-              className="absolute top-4 right-4 p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors opacity-0 group-hover:opacity-100"
-            >
-              {copied === os ? (
-                <Check size={16} className="text-green-400" />
-              ) : (
-                <Copy size={16} />
-              )}
-            </button>
+            <div className="bg-[#0d0d0d] rounded-2xl border border-white/8 overflow-hidden">
+              {/* Titlebar */}
+              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-white/5">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/60" />
+                </div>
+                <span className="ml-3 text-xs text-white/20 font-mono">zsh</span>
+                <button
+                  onClick={() => handleCopy(os)}
+                  className="ml-auto flex items-center gap-1.5 text-xs text-white/30 hover:text-white/70 transition-colors px-3 py-1.5 rounded-lg glass"
+                >
+                  {copied === os ? (
+                    <><Check size={12} className="text-green-400" /><span className="text-green-400">Copied</span></>
+                  ) : (
+                    <><Copy size={12} />Copy</>
+                  )}
+                </button>
+              </div>
+
+              {/* Commands */}
+              <div className="p-6 font-mono text-sm space-y-2">
+                {commands[os].lines.map((line, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-orange-500 select-none">❯</span>
+                    <code className="text-white/80">{line}</code>
+                  </div>
+                ))}
+                <div className="flex items-center gap-3 pt-2 border-t border-white/5 mt-2">
+                  <span className="text-orange-500 select-none">❯</span>
+                  <code className="text-white/80">cd my-repo <span className="text-white/30">&amp;&amp;</span> <span className="text-orange-400 font-bold">zit</span></code>
+                </div>
+              </div>
+            </div>
           </motion.div>
 
-          <div className="mt-6 text-sm text-gray-500">
-            {os === "brew" ? (
-              <p>
-                Recommended for macOS users. Updates are managed automatically.
-              </p>
-            ) : (
-              <p>
-                Requires Rust and Git installed. Works on Linux, macOS, and
-                Windows.
-              </p>
-            )}
-          </div>
-        </div>
+          {/* Hint */}
+          <p className="text-center text-white/25 text-xs mt-5 font-mono">{commands[os].hint}</p>
+        </motion.div>
       </div>
     </section>
   );

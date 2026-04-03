@@ -2,86 +2,117 @@
 
 import { motion } from "framer-motion";
 
+const layers = [
+  {
+    title: "AI Guidance Layer",
+    subtitle: "Amazon Bedrock — Claude 3 Sonnet",
+    desc: "Mentorship, auto error explanation, AI commit messages",
+    color: "border-violet-500/30 bg-violet-500/5 shadow-[0_0_30px_rgba(139,92,246,0.08)]",
+    badge: "text-violet-400",
+    dot: "bg-violet-500",
+    items: ["Explain Repo", "Ask a Question", "Safety Recommendations", "Health Check"],
+  },
+  {
+    title: "Zit TUI Application",
+    subtitle: "Built with Rust + ratatui + crossterm",
+    desc: "All 14 Git features, state management, event loop, safety guardrails",
+    color: "border-orange-500/40 bg-orange-500/5 shadow-[0_0_40px_rgba(249,115,22,0.12)] scale-[1.03]",
+    badge: "text-orange-400",
+    dot: "bg-orange-500",
+    items: ["Staging", "Commits", "Branches", "Timeline", "Time Travel", "Merge Resolve", "Bisect"],
+    youAreHere: true,
+  },
+  {
+    title: "Native Git CLI",
+    subtitle: "Your system's git binary",
+    desc: "100% compatible — no reimplemented internals, runs real git commands",
+    color: "border-white/10 bg-white/2 opacity-75",
+    badge: "text-gray-400",
+    dot: "bg-gray-500",
+    items: ["git status", "git add", "git commit", "git push", "git log"],
+  },
+];
+
 export default function Architecture() {
   return (
     <section id="architecture" className="py-24 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl md:text-5xl font-bold mb-6">
-          Safety by <span className="text-[var(--primary)]">Default</span>
-        </h2>
-        <p className="text-lg text-gray-400 mb-16 max-w-2xl mx-auto">
-          Zit acts as a protective layer between you and Git. It orchestrates
-          the native Git CLI, ensuring 100% compatibility while preventing
-          common mistakes.
-        </p>
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_50%_40%_at_50%_50%,rgba(249,115,22,0.06),transparent)] pointer-events-none"></div>
 
-        <div className="relative max-w-3xl mx-auto">
-          {/* Layers */}
-          <div className="space-y-4">
-            {/* AI Layer */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="p-6 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 backdrop-blur-sm relative z-20"
-            >
-              <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-12 bg-[var(--accent)] rounded-full hidden md:block"></div>
-              <h3 className="text-xl font-bold text-[var(--accent)] mb-2">
-                AI Guidance Layer
-              </h3>
-              <p className="text-gray-400 text-sm">
-                Mentorship, error explanation, and commit suggestions
-              </p>
-            </motion.div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight">
+            How{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">
+              zit works
+            </span>
+          </h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Three clean layers — AI on top, the Rust TUI in the middle, native Git at the bottom. No magic, no bloat.
+          </p>
+        </div>
 
-            {/* TUI Layer */}
+        <div className="space-y-4 relative">
+          {/* Connecting line */}
+          <div className="absolute left-8 top-12 bottom-12 w-px bg-gradient-to-b from-violet-500/30 via-orange-500/50 to-white/10 hidden md:block"></div>
+
+          {layers.map((layer, i) => (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="p-8 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary)]/5 backdrop-blur-sm relative z-20 scale-105 shadow-2xl shadow-[var(--primary)]/10"
+              key={layer.title}
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.15 }}
+              className={`relative rounded-2xl border p-6 md:p-8 backdrop-blur-sm transition-all ${layer.color}`}
             >
-              <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-16 bg-[var(--primary)] rounded-full hidden md:block"></div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-2xl font-bold text-white">
-                  Zit TUI Architecture
-                </h3>
-                <span className="px-2 py-1 text-xs bg-[var(--primary)] text-black font-bold rounded">
+              {layer.youAreHere && (
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-orange-500 text-black text-[10px] font-black rounded-full px-2.5 py-1 tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse"></span>
                   YOU ARE HERE
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-4 text-sm font-mono text-gray-300">
-                <div className="bg-black/50 p-2 rounded border border-white/10">
-                  State Manager
                 </div>
-                <div className="bg-black/50 p-2 rounded border border-white/10">
-                  Safety Checks
+              )}
+              <div className="flex items-start gap-4 md:gap-8">
+                {/* Layer indicator */}
+                <div className="hidden md:flex flex-col items-center gap-2 shrink-0 w-6 mt-1">
+                  <div className={`w-3 h-3 rounded-full ${layer.dot} shrink-0 shadow-[0_0_10px_currentColor]`}></div>
                 </div>
-                <div className="bg-black/50 p-2 rounded border border-white/10">
-                  Orchestrator
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col md:flex-row md:items-center gap-2 mb-1">
+                    <h3 className={`text-xl font-bold text-white`}>{layer.title}</h3>
+                    <span className={`text-xs font-mono ${layer.badge} bg-white/5 px-2 py-0.5 rounded-full border border-white/10 self-start`}>
+                      {layer.subtitle}
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm mb-4">{layer.desc}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {layer.items.map((item) => (
+                      <span
+                        key={item}
+                        className="text-xs font-mono text-gray-400 bg-black/30 border border-white/5 px-2.5 py-1 rounded-lg"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>
+          ))}
+        </div>
 
-            {/* Git Layer */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="p-6 rounded-xl border border-white/10 bg-zinc-900/50 backdrop-blur-sm relative z-10 opacity-80"
-            >
-              <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-12 bg-white/20 rounded-full hidden md:block"></div>
-              <h3 className="text-xl font-bold text-gray-300 mb-2">
-                Native Git CLI
-              </h3>
-              <p className="text-gray-500 text-sm">
-                100% compatible. No reimplementation of internals.
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Connecting lines */}
-          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[var(--primary)]/50 to-transparent -z-10 hidden md:block"></div>
+        {/* Key design decisions */}
+        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            { title: "Shell-based Git", desc: "Runs real `git` — never reimplements git internals for 100% compatibility." },
+            { title: "AI is Optional", desc: "Degrades gracefully to static help when AI is unconfigured or unavailable." },
+            { title: "Non-blocking AI", desc: "All AI calls run in background threads to keep the TUI perfectly responsive." },
+            { title: "Retry with Backoff", desc: "AI client retries transient failures — 2 retries with exponential backoff." },
+          ].map((d) => (
+            <div key={d.title} className="bg-white/3 border border-white/5 rounded-xl p-5">
+              <h4 className="text-white font-bold mb-1 text-sm">⚡ {d.title}</h4>
+              <p className="text-gray-500 text-xs leading-relaxed">{d.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

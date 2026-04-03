@@ -1,216 +1,170 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  MessageSquare,
-  ShieldCheck,
-  Stethoscope,
-  FileSearch,
-  Sparkles,
-} from "lucide-react";
+import { Sparkles, FileSearch, MessageSquare, ShieldCheck, Stethoscope } from "lucide-react";
 import { useState } from "react";
 
-export default function AiFeatures() {
-  const capabilities = [
-    {
-      id: "explain",
-      icon: <FileSearch className="w-6 h-6" />,
-      title: "Explain Repo",
-      desc: "Instant context. The AI analyzes your repository state and explains exactly what's going on in plain English.",
-      prompt: "Explain the current state of my repository",
-      response:
-        "You are on branch 'main' with 3 unstaged files. Your last commit was 2 hours ago. It looks like you're working on the new authentication feature.",
-    },
-    {
-      id: "ask",
-      icon: <MessageSquare className="w-6 h-6" />,
-      title: "Ask a Question",
-      desc: "Stop googling git commands. Ask complex questions and get accurate, context-aware answers.",
-      prompt: "How do I undo the last commit but keep my changes?",
-      response:
-        "You can use `git reset --soft HEAD~1`. This will move the commit pointer back one step but leave your changes staged.",
-    },
-    {
-      id: "recommend",
-      icon: <ShieldCheck className="w-6 h-6" />,
-      title: "Safety Checks",
-      desc: "Get intelligent recommendations before running destructive commands. The AI predicts potential issues.",
-      prompt: "I want to force push to main",
-      response:
-        "⚠️ Warning: This will overwrite remote history. Ensure no one else has pulled these changes. Consider using `--force-with-lease`.",
-    },
-    {
-      id: "health",
-      icon: <Stethoscope className="w-6 h-6" />,
-      title: "Health Check",
-      desc: "Diagnose connectivity issues with the AI backend instantly to ensure your assistant is ready.",
-      prompt: "Run system health check",
-      response: "✅ Backend: Online", // Placeholder to trigger custom render
-    },
-  ];
+const capabilities = [
+  {
+    id: "explain",
+    key: "a → Explain Repo",
+    icon: FileSearch,
+    title: "Explain Repo",
+    desc: "AI reads your repository state and tells you exactly what's going on — in plain English.",
+    response: "You're on `feat/ai-mentor`, 3 files modified. Last commit 2h ago — looks like you're building the authentication flow. 2 commits ahead of origin.",
+  },
+  {
+    id: "ask",
+    key: "a → Ask a Question",
+    icon: MessageSquare,
+    title: "Ask Anything",
+    desc: "Ask complex Git questions and get accurate, context-aware answers. No Googling.",
+    response: '`git reset --soft HEAD~1` — moves the commit pointer back one step but leaves your changes staged, ready to recommit.',
+  },
+  {
+    id: "recommend",
+    key: "a → Recommend",
+    icon: ShieldCheck,
+    title: "Safety Checks",
+    desc: "Get AI warnings before destructive operations. It predicts what could go wrong.",
+    response: "⚠️ Force-pushing to main will rewrite shared history. Consider `--force-with-lease` to protect teammates who may have pulled.",
+  },
+  {
+    id: "commit",
+    key: "Ctrl+G in Commit View",
+    icon: Sparkles,
+    title: "AI Commit Message",
+    desc: "Press Ctrl+G in the commit editor — AI generates a commit message from your staged diff.",
+    response: "feat(staging): add hunk-level diff preview with syntax highlighting\n\nImproves the interactive staging view to show colored diffs at the hunk level, making it easier to review changes before committing.",
+  },
+];
 
+export default function AiFeatures() {
   const [active, setActive] = useState(capabilities[0]);
 
   return (
-    <section
-      id="ai-mentor"
-      className="py-24 bg-zinc-900/50 border-y border-white/5 relative overflow-hidden"
-    >
-      {/* Background Gradient */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-[var(--accent)]/10 rounded-full blur-[100px] pointer-events-none" />
+    <section id="ai-mentor" className="py-32 relative overflow-hidden">
+      {/* Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-violet-500/6 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col lg:flex-row gap-16 items-center">
-          {/* Left: Content List */}
-          <div className="flex-1 space-y-8 w-full">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-sm font-medium border border-[var(--accent)]/20">
-                <Sparkles size={14} />
-                <span>Powered by Claude 3 Sonnet</span>
-              </div>
-              <h2 className="text-3xl md:text-5xl font-bold">
-                Meet your new <br />
-                <span className="text-gradient-ai">Git Mentor</span>
-              </h2>
-              <p className="text-gray-400 text-lg leading-relaxed">
-                Zit doesn&apos;t just run commands; it understands them. The baked-in
-                AI mentor guides you through complex operations, explains errors
-                automatically, and helps you learn as you code.
-              </p>
-            </div>
-
-            <div className="grid gap-4">
-              {capabilities.map((cap) => (
-                <button
-                  key={cap.id}
-                  onClick={() => setActive(cap)}
-                  className={`flex items-start gap-4 p-4 rounded-xl text-left transition-all border ${
-                    active.id === cap.id
-                      ? "bg-[var(--accent)]/10 border-[var(--accent)]/50 shadow-lg shadow-[var(--accent)]/5"
-                      : "bg-white/5 border-transparent hover:bg-white/10 text-gray-400"
-                  }`}
-                >
-                  <div
-                    className={`mt-1 ${active.id === cap.id ? "text-[var(--accent)]" : "text-gray-500"}`}
-                  >
-                    {cap.icon}
-                  </div>
-                  <div>
-                    <h3
-                      className={`font-bold ${active.id === cap.id ? "text-white" : "text-gray-300"}`}
-                    >
-                      {cap.title}
-                    </h3>
-                    <p className="text-sm mt-1 opacity-80 leading-relaxed">
-                      {cap.desc}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: Interactive Preview */}
-          <div className="flex-1 w-full relative">
-            <motion.div
-              key={active.id}
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="relative z-10"
+      <div className="relative z-10 max-w-6xl mx-auto px-6">
+        <div className="flex flex-col lg:flex-row gap-16 items-start">
+          {/* Left */}
+          <div className="flex-1 lg:sticky lg:top-28">
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="text-sm font-semibold text-violet-400 tracking-widest uppercase mb-4"
             >
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0D0D0D] shadow-2xl">
-                {/* Window Title Bar */}
-                <div className="bg-[#1a1a1a] px-4 py-3 border-b border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-500/80" />
-                    <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                    <span className="w-3 h-3 rounded-full bg-green-500/80" />
+              AI Mentor
+            </motion.p>
+            <motion.h2
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              className="text-4xl md:text-5xl font-black tracking-tight mb-5 leading-[1.05]"
+            >
+              Git with a{" "}
+              <span className="text-purple">teacher
+              </span>{" "}
+              built in.
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="text-white/40 text-base leading-relaxed mb-10 max-w-sm"
+            >
+              Powered by Amazon Bedrock (Claude 3 Sonnet). The AI mentor explains errors
+              automatically, answers questions, and generates commit messages — all without leaving your terminal.
+            </motion.p>
+
+            {/* Capability list */}
+            <div className="space-y-2">
+              {capabilities.map((cap) => {
+                const Icon = cap.icon;
+                return (
+                  <button
+                    key={cap.id}
+                    onClick={() => setActive(cap)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all duration-200 border ${
+                      active.id === cap.id
+                        ? "bg-violet-500/10 border-violet-500/20 text-white"
+                        : "border-transparent hover:bg-white/3 text-white/40 hover:text-white/70"
+                    }`}
+                  >
+                    <Icon size={18} className={active.id === cap.id ? "text-violet-400" : ""} />
+                    <div>
+                      <div className={`font-semibold text-sm ${active.id === cap.id ? "text-white" : ""}`}>{cap.title}</div>
+                      <div className="text-xs font-mono opacity-50 mt-0.5">{cap.key}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right — Demo terminal */}
+          <motion.div
+            key={active.id}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 w-full"
+          >
+            <div className="rounded-2xl bg-[#0d0d0d] border border-white/8 overflow-hidden shadow-2xl">
+              {/* Titlebar */}
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/5">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/60" />
+                </div>
+                <span className="ml-3 text-xs text-white/20 font-mono">zit — AI Mentor</span>
+                <div className="ml-auto flex items-center gap-1.5 text-[10px] text-violet-400/60 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-pulse" />
+                  Claude 3 Sonnet
+                </div>
+              </div>
+
+              {/* Chat body */}
+              <div className="p-6 space-y-6 min-h-[320px] font-mono text-sm">
+                {/* Description card */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-white/3 border border-white/5">
+                  <div className="text-violet-400/60 text-xs mt-0.5">FEATURE</div>
+                  <div>
+                    <div className="text-white font-bold text-sm mb-1">{active.title}</div>
+                    <p className="text-white/40 text-xs leading-relaxed">{active.desc}</p>
                   </div>
-                  <div className="text-xs font-mono text-gray-500">
-                    AI Mentor Panel
-                  </div>
-                  <div className="w-10" />
                 </div>
 
-                {/* Chat Interface */}
-                <div className="p-6 font-mono text-sm h-[400px] flex flex-col justify-end">
-                  <div className="space-y-6">
-                    {/* User User */}
-                    <div className="flex justify-end">
-                      <span className="bg-[#2a2a2a] text-white px-4 py-3 rounded-2xl rounded-tr-sm max-w-[80%]">
-                        {active.prompt}
-                      </span>
-                    </div>
-
-                    {/* AI Response */}
-                    <div className="flex justify-start items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 mt-1">
-                        <Sparkles size={16} className="text-white" />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="text-[var(--accent)] text-xs font-bold mb-1">
-                          ZIT AI
-                        </div>
-                        <span className="block text-gray-300 bg-[var(--accent)]/5 border border-[var(--accent)]/10 px-4 py-3 rounded-2xl rounded-tl-sm leading-relaxed whitespace-pre-wrap">
-                          {renderResponse(active.response)}
-                        </span>
-                      </div>
-                    </div>
+                {/* AI response */}
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles size={13} className="text-violet-400" />
                   </div>
-                </div>
-
-                {/* Input Area (Fake) */}
-                <div className="p-4 border-t border-white/10 bg-[#151515]">
-                  <div className="flex gap-2">
-                    <div className="w-full bg-[#0a0a0a] border border-white/10 rounded px-3 py-2 text-gray-600">
-                      Type your question...
+                  <div className="flex-1">
+                    <div className="text-violet-400/70 text-[10px] font-semibold tracking-wider mb-2">ZIT AI</div>
+                    <div className="text-white/70 bg-violet-500/5 border border-violet-500/10 rounded-xl px-4 py-3 leading-relaxed text-xs whitespace-pre-wrap">
+                      {active.response}
                     </div>
                   </div>
                 </div>
               </div>
-            </motion.div>
 
-            {/* Background Glow */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/20 to-transparent blur-3xl -z-10 rounded-full opacity-60"></div>
-          </div>
+              {/* Input */}
+              <div className="px-6 pb-5">
+                <div className="flex items-center gap-3 bg-white/3 border border-white/5 rounded-xl px-4 py-3">
+                  <span className="text-white/20 text-xs">Ask anything about Git…</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>
   );
-}
-
-// Helper to render simple markdown-like formatting
-function renderResponse(text: string) {
-  if (text.includes("Warning")) {
-    return (
-      <>
-        <span className="text-yellow-500 font-bold block mb-1">⚠️ Warning</span>
-        <span className="text-white">
-          This will overwrite remote history. Ensure no one else has pulled
-          these changes. Consider using{" "}
-          <code className="bg-white/10 px-1 rounded text-yellow-200">
-            --force-with-lease
-          </code>
-          .
-        </span>
-      </>
-    );
-  }
-  if (text.includes("Backend:")) {
-    return (
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 text-green-400">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span> AI
-          Backend: Online (24ms)
-        </div>
-        <div className="flex items-center gap-2 text-green-400">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span> AWS
-          Bedrock: Connected
-        </div>
-        <div className="text-gray-400 text-xs ml-4">Model: Claude 3 Sonnet</div>
-      </div>
-    );
-  }
-  return text;
 }
