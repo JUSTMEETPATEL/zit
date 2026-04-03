@@ -25,6 +25,8 @@
 - **Workflow Builder** — visually compose multi-step git workflows (`w`)
 - **GitHub Integration** — OAuth device flow, repo creation, push/pull/sync, collaborators, pull requests, and CI/CD actions (`g`)
 - **🤖 AI Mentor** — AI-powered assistant for explanations, recommendations, and error help (`a`)
+- **🤖 Agent Mode** — autonomous chat interface where an AI agent plans and safely executes git commands for you (`A`)
+- **🔒 Secret Scanning** — built-in GitGuardian-style local engine blocks accidental commits of sensitive information
 
 ## Installation
 
@@ -77,12 +79,20 @@ zit
 | `w` | **Workflow** — build multi-step git workflows |
 | `g` | **GitHub** — sync, push/pull, PRs, actions, collaborators |
 | `a` | **AI Mentor** — explain repo, ask questions, get recommendations |
+| `A` | **Agent Mode** — autonomous conversational Git operations |
 | `?` | **Help** — context-sensitive keybinding reference |
 | `q` | **Quit** |
 
-### AI Mentor
+### AI Mentor & Agent Mode
 
-The AI Mentor panel (`a` from the dashboard) provides four capabilities:
+**Agent Mode (`A`)**
+Press `A` from the dashboard to enter a fully autonomous chat interface:
+1. Type a natural language request (e.g., "undo my last commit and push to a new branch")
+2. The AI inspects the repo, plans the `git` commands, and asks for permission before running any destructive operations (like `--force`).
+3. Read-only commands are executed automatically, and the AI uses the output to continue the loop until your task is done.
+
+**AI Mentor (`a`)**
+The AI Mentor panel provides manual assistance:
 
 | Feature | Description |
 |---------|-------------|
@@ -220,6 +230,7 @@ src/
 │   ├── reflog.rs      # Reflog parser
 │   ├── bisect.rs      # Git bisect operations
 │   ├── cherry_pick.rs # Cherry-pick operations
+│   ├── secrets.rs     # Local secret scanning engine
 │   └── github_auth.rs # GitHub OAuth device flow
 └── ui/
     ├── dashboard.rs       # Repository dashboard view
@@ -236,6 +247,7 @@ src/
     ├── workflow_builder.rs # Workflow builder view
     ├── github.rs          # GitHub integration view
     ├── ai_mentor.rs       # AI Mentor panel (menu, input, result)
+    ├── agent.rs           # Agent Mode chat interface
     ├── help.rs            # Context-sensitive help overlay
     └── utils.rs           # Shared UI utilities
 aws/
