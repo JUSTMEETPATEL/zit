@@ -20,7 +20,6 @@ pub enum View {
     TimeTravel,
     Reflog,
     GitHub,
-    AiMentor,
     Stash,
     MergeResolve,
     WorkflowBuilder,
@@ -233,8 +232,7 @@ impl App {
             View::Timeline => self.timeline_state.refresh(),
             View::TimeTravel => self.time_travel_state.refresh(),
             View::Reflog => self.reflog_state.refresh(),
-            View::GitHub => {}   // no auto-refresh for GitHub
-            View::AiMentor => {} // no auto-refresh
+            View::GitHub => {} // no auto-refresh for GitHub
             View::Stash => self.stash_state.refresh(),
             View::MergeResolve => self.merge_resolve_state.refresh(),
             View::WorkflowBuilder => {} // no auto-refresh
@@ -439,7 +437,16 @@ impl App {
         match key.code {
             KeyCode::Char('q') => {
                 if self.view == View::Dashboard {
-                    self.running = false;
+                    use dashboard::DashboardFocus;
+                    match self.dashboard_state.focus {
+                        DashboardFocus::Right => {
+                            // When AI panel focused, let dashboard handler decide (returns focus to left)
+                            dashboard::handle_key(self, key)?;
+                        }
+                        DashboardFocus::Left => {
+                            self.running = false;
+                        }
+                    }
                 } else {
                     self.view = View::Dashboard;
                     self.dashboard_state.refresh();
@@ -458,8 +465,15 @@ impl App {
             _ => {}
         }
 
-        // Navigation from Dashboard
+        // Navigation from Dashboard (only when left panel is focused)
         if self.view == View::Dashboard {
+            use dashboard::DashboardFocus;
+            if self.dashboard_state.focus == DashboardFocus::Right {
+                // When AI panel is focused, skip all dashboard navigation keys
+                // and delegate directly to the dashboard handler (which routes to AI mentor)
+                dashboard::handle_key(self, key)?;
+                return Ok(());
+            }
             match key.code {
                 KeyCode::Char('s') => {
                     self.view = View::Staging;
@@ -497,7 +511,7 @@ impl App {
                     return Ok(());
                 }
                 KeyCode::Char('a') => {
-                    self.view = View::AiMentor;
+                    self.dashboard_state.focus = dashboard::DashboardFocus::Right;
                     return Ok(());
                 }
                 KeyCode::Char('x') => {
@@ -546,7 +560,6 @@ impl App {
             View::TimeTravel => time_travel::handle_key(self, key)?,
             View::Reflog => reflog::handle_key(self, key)?,
             View::GitHub => github::handle_key(self, key)?,
-            View::AiMentor => ai_mentor::handle_key(self, key)?,
             View::Stash => stash::handle_key(self, key)?,
             View::MergeResolve => merge_resolve::handle_key(self, key)?,
             View::WorkflowBuilder => workflow_builder::handle_key(self, key)?,

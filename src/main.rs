@@ -226,7 +226,23 @@ fn draw(f: &mut Frame, app: &mut App) {
     // Render the current view
     match app.view {
         View::Dashboard => {
-            ui::dashboard::render(f, area, &app.dashboard_state, &app.status_message);
+            let ai_available = app.ai_client.is_some();
+            let loading = app.ai_loading;
+            let provider_label = app
+                .ai_client
+                .as_ref()
+                .map(|c| c.provider_name().to_string())
+                .unwrap_or_default();
+            ui::dashboard::render(
+                f,
+                area,
+                &app.dashboard_state,
+                &app.status_message,
+                &app.ai_mentor_state,
+                ai_available,
+                loading,
+                &provider_label,
+            );
         }
         View::Staging => {
             ui::staging::render(f, area, &mut app.staging_state);
@@ -251,23 +267,6 @@ fn draw(f: &mut Frame, app: &mut App) {
         View::GitHub => {
             let config = &app.config;
             ui::github::render(f, area, &mut app.github_state, config);
-        }
-        View::AiMentor => {
-            let ai_available = app.ai_client.is_some();
-            let loading = app.ai_loading;
-            let provider_label = app
-                .ai_client
-                .as_ref()
-                .map(|c| c.provider_name().to_string())
-                .unwrap_or_default();
-            ui::ai_mentor::render(
-                f,
-                area,
-                &app.ai_mentor_state,
-                ai_available,
-                loading,
-                &provider_label,
-            );
         }
         View::Stash => {
             ui::stash::render(f, area, &mut app.stash_state);

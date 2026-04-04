@@ -132,7 +132,7 @@ impl AiMentorState {
     }
 }
 
-const MENU_ITEMS: &[(&str, &str)] = &[
+pub const MENU_ITEMS: &[(&str, &str)] = &[
     ("🔍 Explain Repo", "Explain the current repository state"),
     ("💬 Ask a Question", "Ask the AI mentor anything about git"),
     (
@@ -152,6 +152,7 @@ const MENU_ITEMS: &[(&str, &str)] = &[
     ),
 ];
 
+#[allow(dead_code)]
 pub fn render(
     f: &mut Frame,
     area: Rect,
@@ -255,6 +256,7 @@ pub fn render(
     f.render_widget(hints_widget, chunks[2]);
 }
 
+#[allow(dead_code)]
 fn render_menu(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: bool) {
     let mut lines = Vec::new();
     lines.push(Line::from(Span::raw("")));
@@ -312,6 +314,7 @@ fn render_menu(f: &mut Frame, area: Rect, state: &AiMentorState, ai_available: b
     f.render_widget(menu, area);
 }
 
+#[allow(dead_code)]
 fn render_input(f: &mut Frame, area: Rect, state: &AiMentorState) {
     let action_label = state.last_action.as_deref().unwrap_or("Question");
 
@@ -344,6 +347,7 @@ fn render_input(f: &mut Frame, area: Rect, state: &AiMentorState) {
     f.render_widget(input_widget, area);
 }
 
+#[allow(dead_code)]
 fn render_result(f: &mut Frame, area: Rect, state: &AiMentorState) {
     let title_text = state.last_action.as_deref().unwrap_or("AI Response");
 
@@ -375,6 +379,7 @@ fn render_result(f: &mut Frame, area: Rect, state: &AiMentorState) {
     f.render_widget(result, area);
 }
 
+#[allow(dead_code)]
 fn render_history(f: &mut Frame, area: Rect, state: &AiMentorState) {
     if state.history.is_empty() {
         let empty = Paragraph::new(vec![
