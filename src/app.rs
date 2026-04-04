@@ -93,9 +93,9 @@ pub enum FollowUpAction {
 /// Describes the git action that was pending when secrets were detected.
 #[derive(Debug, Clone)]
 pub enum SecretPendingAction {
-    StageFile(String),  // single file path
-    StageAll,           // stage all files
-    Commit,             // commit with current message
+    StageFile(String), // single file path
+    StageAll,          // stage all files
+    Commit,            // commit with current message
 }
 
 #[derive(Debug, Clone)]
@@ -757,7 +757,10 @@ impl App {
                     Ok(output) => {
                         self.set_status(format!(
                             "⚠ {}",
-                            output.lines().next().unwrap_or("Committed (secrets warning overridden)")
+                            output
+                                .lines()
+                                .next()
+                                .unwrap_or("Committed (secrets warning overridden)")
                         ));
                         self.commit_state.message.clear();
                         self.commit_state.editing = true;
@@ -1422,15 +1425,16 @@ impl App {
                 agent::MessageRole::System => {
                     // skip system messages in AI context
                 }
-                agent::MessageRole::Permission { command, approved } => {
-                    match approved {
-                        Some(true) => parts.push(format!("[APPROVED] git {}", command)),
-                        Some(false) => {
-                            parts.push(format!("[DENIED] git {} -- user denied this command, suggest alternative", command));
-                        }
-                        None => {}
+                agent::MessageRole::Permission { command, approved } => match approved {
+                    Some(true) => parts.push(format!("[APPROVED] git {}", command)),
+                    Some(false) => {
+                        parts.push(format!(
+                            "[DENIED] git {} -- user denied this command, suggest alternative",
+                            command
+                        ));
                     }
-                }
+                    None => {}
+                },
             }
         }
 
@@ -1521,10 +1525,8 @@ impl App {
                 let cmd = cmd.trim();
                 // Parse "git <args>"
                 if let Some(git_args) = cmd.strip_prefix("git ") {
-                    let args: Vec<String> = git_args
-                        .split_whitespace()
-                        .map(|s| s.to_string())
-                        .collect();
+                    let args: Vec<String> =
+                        git_args.split_whitespace().map(|s| s.to_string()).collect();
                     if !args.is_empty() {
                         // Use the preceding text as the description
                         let desc = text_parts.last().cloned().unwrap_or_default();
@@ -1656,38 +1658,100 @@ impl App {
                     match action {
                         Some(AiAction::CommitSuggest) => {
                             let mut suggestions = Vec::new();
+                            let mut raw_lines = Vec::new();
+
                             for line in response.lines() {
-                                if let Some(msg) = line.strip_prefix("[SUGGESTION] ") {
+                                let trimmed = line.trim();
+
+                                // Primary: [SUGGESTION] prefix
+                                if let Some(msg) = trimmed.strip_prefix("[SUGGESTION] ") {
+                                    let msg = msg.trim();
+                                    if !msg.is_empty() {
+                                        suggestions.push(FollowUpItem {
+                                            label: msg.to_string(),
+                                            description: "Select this commit message".to_string(),
+                                            action: FollowUpAction::SetCommitMessage(
+                                                msg.to_string(),
+                                            ),
+                                        });
+                                    }
+                                    continue;
+                                }
+
+                                // Fallback: numbered list like "1. feat: ..."
+                                if let Some(msg) =
+                                    trimmed.strip_prefix(|c: char| c.is_ascii_digit())
+                                {
+                                    if let Some(msg) = msg.strip_prefix(['.', ')', ':']) {
+                                        let msg = msg.trim();
+                                        if !msg.is_empty() && !msg.starts_with('[') {
+                                            raw_lines.push(msg.to_string());
+                                        }
+                                    }
+                                }
+
+                                // Fallback: bullet points like "- feat: ..." or "* feat: ..."
+                                if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+                                    let msg = trimmed[2..].trim();
+                                    if !msg.is_empty() && looks_like_commit_msg(msg) {
+                                        raw_lines.push(msg.to_string());
+                                    }
+                                }
+                            }
+
+                            // If we found numbered/bullet lines but no [SUGGESTION] lines, use them
+                            if suggestions.is_empty() && !raw_lines.is_empty() {
+                                for msg in raw_lines {
                                     suggestions.push(FollowUpItem {
-                                        label: msg.trim().to_string(),
+                                        label: msg.clone(),
                                         description: "Select this commit message".to_string(),
+                                        action: FollowUpAction::SetCommitMessage(msg),
+                                    });
+                                }
+                            }
+
+                            // Last resort: treat each non-empty line as a suggestion
+                            if suggestions.is_empty() {
+                                for line in response.lines() {
+                                    let trimmed = line.trim();
+                                    if !trimmed.is_empty() && looks_like_commit_msg(trimmed) {
+                                        suggestions.push(FollowUpItem {
+                                            label: trimmed.to_string(),
+                                            description: "Select this commit message".to_string(),
+                                            action: FollowUpAction::SetCommitMessage(
+                                                trimmed.to_string(),
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+
+                            // Absolute fallback: use entire response as one option
+                            if suggestions.is_empty() {
+                                let trimmed = response.trim();
+                                if !trimmed.is_empty() {
+                                    suggestions.push(FollowUpItem {
+                                        label: trimmed.to_string(),
+                                        description: "Use AI response as commit message"
+                                            .to_string(),
                                         action: FollowUpAction::SetCommitMessage(
-                                            msg.trim().to_string(),
+                                            trimmed.to_string(),
                                         ),
                                     });
                                 }
                             }
 
                             if suggestions.is_empty() {
-                                // Fallback if AI didn't follow the exact formatting
-                                suggestions.push(FollowUpItem {
-                                    label: "Use raw AI output".to_string(),
-                                    description: "AI didn't format correctly. Use full text."
-                                        .to_string(),
-                                    action: FollowUpAction::SetCommitMessage(
-                                        response.trim().to_string(),
-                                    ),
-                                });
+                                self.set_status("AI returned an empty response. Try again.");
+                            } else {
+                                self.popup = Popup::FollowUp {
+                                    title: "🤖 Select Commit Message".to_string(),
+                                    context: "Choose an AI-generated commit message:".to_string(),
+                                    suggestions,
+                                    selected: 0,
+                                };
+                                self.set_status("✓ AI suggestions ready — select one");
                             }
-
-                            self.popup = Popup::FollowUp {
-                                title: "🤖 Select Commit Message".to_string(),
-                                context: "Choose an AI-generated commit message:".to_string(),
-                                suggestions,
-                                selected: 0,
-                            };
-
-                            self.set_status("✓ AI suggestions ready — select one");
 
                             // Store in history
                             self.ai_mentor_state.add_history(
@@ -2195,4 +2259,35 @@ fn generate_strategy_follow_ups(response: &str) -> Vec<FollowUpItem> {
     });
 
     items
+}
+
+/// Heuristic check: does this string look like a reasonable commit message?
+fn looks_like_commit_msg(s: &str) -> bool {
+    if s.len() > 120 || s.len() < 3 {
+        return false;
+    }
+    if s.ends_with('.') || s.ends_with('!') || s.ends_with('?') {
+        return false;
+    }
+    let lower = s.to_lowercase();
+    if lower.starts_with("here")
+        || lower.starts_with("sure")
+        || lower.starts_with("yes")
+        || lower.starts_with("no ")
+        || lower.starts_with("the ")
+        || lower.starts_with("this ")
+        || lower.starts_with("i would")
+        || lower.starts_with("i'll")
+        || lower.starts_with("i can")
+        || lower.starts_with("you should")
+        || lower.starts_with("you could")
+        || lower.starts_with("here are")
+        || lower.starts_with("here's")
+        || lower.starts_with("below are")
+        || lower.starts_with("based on")
+        || lower.starts_with("looking at")
+    {
+        return false;
+    }
+    true
 }

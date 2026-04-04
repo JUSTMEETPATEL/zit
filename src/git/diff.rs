@@ -28,12 +28,14 @@ pub struct Hunk {
 
 #[derive(Debug, Clone)]
 pub struct FileDiff {
+    #[allow(dead_code)]
     pub path: String,
     pub old_path: Option<String>,
     pub hunks: Vec<Hunk>,
 }
 
 /// Get diff of unstaged changes (working tree vs index).
+#[allow(dead_code)]
 pub fn get_unstaged_diff() -> Result<Vec<FileDiff>> {
     let output = run_git(&["diff"])?;
     Ok(parse_diff_output(&output))

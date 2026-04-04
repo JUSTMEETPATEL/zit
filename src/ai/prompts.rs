@@ -66,10 +66,15 @@ Generate commit messages that are:
 - Descriptive but concise
 - Following conventional commits format when appropriate (feat:, fix:, docs:, etc.)
 
-Provide 2-3 suggestions, from most specific to most general.
-Format your response EXACTLY by prefixing each suggestion with "[SUGGESTION] ". For example:
-[SUGGESTION] feat: add new login page
-[SUGGESTION] fix: resolve crash on startup"#;
+You MUST respond with EXACTLY 3 suggestions, each on its own line, prefixed with "[SUGGESTION] ".
+Do NOT include any explanation, reasoning, or other text.
+Do NOT use markdown formatting, code blocks, or bullet points.
+Only output the 3 lines, nothing else.
+
+Example response:
+[SUGGESTION] feat: add user authentication
+[SUGGESTION] fix: resolve login redirect loop
+[SUGGESTION] update auth flow with OAuth support"#;
 
 pub const PROMPT_LEARN: &str = r#"You are an expert Git teacher helping developers learn Git concepts.
 
