@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -6,6 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
+use std::sync::mpsc;
+use std::time::SystemTime;
 
 // ─── Message types ─────────────────────────────────────────────
 
@@ -18,6 +20,7 @@ pub enum MessageRole {
         command: String,
         output: String,
         success: bool,
+        collapsed: bool,
     },
     System,
     Permission {
@@ -47,8 +50,10 @@ pub struct PendingCommand {
 pub struct AgentState {
     /// Conversation messages.
     pub messages: Vec<AgentMessage>,
-    /// Scroll offset for the conversation area.
+    /// Scroll offset for the conversation area (0 = top).
     pub scroll: u16,
+    /// Whether user has manually scrolled (disables auto-scroll).
+    pub user_scrolled: bool,
     /// Current user input text.
     pub input: String,
     /// Whether the input bar is active (insert mode).
@@ -65,6 +70,20 @@ pub struct AgentState {
     pub pending_tool_uses: Vec<(String, Vec<String>)>,
     /// Pending agent text accumulated before/between tool uses.
     pub pending_agent_text: Option<String>,
+    /// Input history for Up/Down navigation.
+    pub input_history: Vec<String>,
+    /// Current position in input history.
+    pub history_index: usize,
+    /// Receiver for async git command execution results.
+    pub command_receiver: Option<mpsc::Receiver<(String, String, bool)>>,
+    /// Whether a git command is currently executing asynchronously.
+    pub command_executing: bool,
+    /// Whether the conversation content has changed (for cached rendering).
+    pub dirty: bool,
+    /// Cached rendered lines (to avoid rebuilding every frame).
+    pub cached_lines: Option<Vec<Line<'static>>>,
+    /// Cached total line count.
+    pub cached_line_count: usize,
 }
 
 impl Default for AgentState {
@@ -75,6 +94,7 @@ impl Default for AgentState {
                 content: "Agent ready. Describe what you want to do with your repo.".to_string(),
             }],
             scroll: 0,
+            user_scrolled: false,
             input: String::new(),
             input_active: true,
             pending_command: None,
@@ -83,6 +103,13 @@ impl Default for AgentState {
             auto_approve: false,
             pending_tool_uses: Vec::new(),
             pending_agent_text: None,
+            input_history: Vec::new(),
+            history_index: 0,
+            command_receiver: None,
+            command_executing: false,
+            dirty: true,
+            cached_lines: None,
+            cached_line_count: 0,
         }
     }
 }
@@ -97,8 +124,8 @@ impl AgentState {
 // ─── Spinner ───────────────────────────────────────────────────
 
 const SPINNER_FRAMES: &[char] = &[
-    '\u{280B}', '\u{2819}', '\u{2839}', '\u{2838}', '\u{283C}', '\u{2834}', '\u{2826}',
-    '\u{2827}', '\u{2807}', '\u{280F}',
+    '\u{280B}', '\u{2819}', '\u{2839}', '\u{2838}', '\u{283C}', '\u{2834}', '\u{2826}', '\u{2827}',
+    '\u{2807}', '\u{280F}',
 ];
 
 fn spinner_char() -> char {
@@ -165,7 +192,7 @@ pub fn is_destructive_command(args: &[String]) -> bool {
 pub fn render(
     f: &mut Frame,
     area: Rect,
-    state: &AgentState,
+    state: &mut AgentState,
     ai_available: bool,
     loading: bool,
     provider_label: &str,
@@ -174,7 +201,7 @@ pub fn render(
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Title bar
-            Constraint::Min(6),   // Conversation area
+            Constraint::Min(6),    // Conversation area
             Constraint::Length(3), // Input bar
         ])
         .split(area);
@@ -192,8 +219,7 @@ fn render_title(
     provider_label: &str,
 ) {
     // Get current branch
-    let branch = crate::git::branch::BranchOps::current()
-        .unwrap_or_else(|_| "unknown".to_string());
+    let branch = crate::git::branch::BranchOps::current().unwrap_or_else(|_| "unknown".to_string());
 
     let status_span = if loading {
         Span::styled(" Thinking... ", Style::default().fg(Color::Yellow))
@@ -219,10 +245,7 @@ fn render_title(
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            format!(" {} ", branch),
-            Style::default().fg(Color::Magenta),
-        ),
+        Span::styled(format!(" {} ", branch), Style::default().fg(Color::Magenta)),
         Span::raw(" "),
         status_span,
         provider_span,
@@ -235,8 +258,78 @@ fn render_title(
     f.render_widget(title, area);
 }
 
-fn render_conversation(f: &mut Frame, area: Rect, state: &AgentState, loading: bool) {
-    let mut lines: Vec<Line> = Vec::new();
+fn render_conversation(f: &mut Frame, area: Rect, state: &mut AgentState, loading: bool) {
+    // Rebuild lines when content changed OR when dynamic indicators are active
+    // (thinking/executing spinners change every frame, so cache would show stale state)
+    let needs_rebuild =
+        state.dirty || state.cached_lines.is_none() || loading || state.command_executing;
+
+    let lines: Vec<Line> = if needs_rebuild {
+        let built = build_conversation_lines(state, loading);
+        state.cached_line_count = built.len();
+        state.cached_lines = Some(built.clone());
+        if !loading && !state.command_executing {
+            state.dirty = false;
+        }
+        built
+    } else {
+        state.cached_lines.clone().unwrap_or_default()
+    };
+
+    // Scrolling
+    let total_lines = lines.len() as u16;
+    let visible_height = area.height.saturating_sub(2);
+    let max_scroll = total_lines.saturating_sub(visible_height);
+
+    let effective_scroll = if state.user_scrolled {
+        state.scroll.min(max_scroll)
+    } else {
+        max_scroll
+    };
+
+    let conversation = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::DarkGray)),
+        )
+        .scroll((effective_scroll, 0))
+        .wrap(Wrap { trim: false });
+    f.render_widget(conversation, area);
+
+    // Scroll indicator (right side)
+    if total_lines > visible_height {
+        let pct = if max_scroll == 0 {
+            1.0
+        } else {
+            effective_scroll as f64 / max_scroll as f64
+        };
+        let bar_height = visible_height.max(1);
+        let thumb_pos = (pct * (bar_height - 1) as f64).round() as u16;
+        let thumb_char = '\u{2588}';
+        let track_char = '\u{2591}';
+
+        for y in 0..bar_height {
+            let ch = if y == thumb_pos {
+                thumb_char
+            } else {
+                track_char
+            };
+            let x = area.x + area.width.saturating_sub(1);
+            let style = if y == thumb_pos {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            f.buffer_mut()[(x, area.y + 1 + y)]
+                .set_char(ch)
+                .set_style(style);
+        }
+    }
+}
+
+fn build_conversation_lines(state: &AgentState, loading: bool) -> Vec<Line<'static>> {
+    let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::from(Span::raw("")));
 
     for msg in &state.messages {
@@ -251,81 +344,101 @@ fn render_conversation(f: &mut Frame, area: Rect, state: &AgentState, loading: b
                 lines.push(Line::from(Span::raw("")));
             }
             MessageRole::User => {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        "  You ",
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(
-                        " ────────────────────────────────────────",
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
+                lines.push(Line::from(Span::styled(
+                    "  ╭─ You",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )));
                 for l in msg.content.lines() {
                     lines.push(Line::from(Span::styled(
-                        format!("  {}", l),
+                        format!("  │ {}", l),
                         Style::default().fg(Color::White),
                     )));
                 }
+                lines.push(Line::from(Span::styled(
+                    "  ╰─────────────────────────────────────────────",
+                    Style::default().fg(Color::DarkGray),
+                )));
                 lines.push(Line::from(Span::raw("")));
             }
             MessageRole::Agent => {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        "  Agent ",
-                        Style::default()
-                            .fg(Color::Green)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(
-                        " ──────────────────────────────────────",
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
+                lines.push(Line::from(Span::styled(
+                    "  ╭─ Agent",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )));
                 for l in msg.content.lines() {
                     lines.push(Line::from(Span::styled(
-                        format!("  {}", l),
+                        format!("  │ {}", l),
                         Style::default().fg(Color::White),
                     )));
                 }
+                lines.push(Line::from(Span::styled(
+                    "  ╰─────────────────────────────────────────────",
+                    Style::default().fg(Color::DarkGray),
+                )));
                 lines.push(Line::from(Span::raw("")));
             }
             MessageRole::ToolUse {
                 command,
                 output,
                 success,
+                collapsed,
             } => {
-                let status_marker = if *success { "+" } else { "x" };
+                let status_marker = if *success { "✓" } else { "✗" };
                 let status_color = if *success { Color::Green } else { Color::Red };
+                let toggle = if *collapsed { "▶" } else { "▼" };
+                let output_line_count = output.lines().count();
+
                 lines.push(Line::from(vec![
                     Span::styled(
-                        format!("  [{}] ", status_marker),
+                        format!("  {} ", status_marker),
                         Style::default().fg(status_color),
                     ),
+                    Span::styled(format!("{} ", toggle), Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("> git {}", command),
+                        format!("git {}", command),
                         Style::default()
                             .fg(Color::Yellow)
                             .add_modifier(Modifier::BOLD),
                     ),
+                    Span::styled(
+                        format!(" ({} lines)", output_line_count),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
-                if !output.is_empty() {
+
+                if !*collapsed && !output.is_empty() {
                     lines.push(Line::from(Span::styled(
                         "  ┌─────────────────────────────────────────────────",
                         Style::default().fg(Color::DarkGray),
                     )));
                     for l in output.lines().take(30) {
-                        lines.push(Line::from(Span::styled(
-                            format!("  | {}", l),
-                            Style::default().fg(Color::DarkGray),
-                        )));
+                        let line_style = if l.starts_with('+') {
+                            Style::default().fg(Color::Green)
+                        } else if l.starts_with('-') {
+                            Style::default().fg(Color::Red)
+                        } else if l.starts_with("@@")
+                            || l.starts_with("diff")
+                            || l.starts_with("index")
+                        {
+                            Style::default().fg(Color::Cyan)
+                        } else {
+                            Style::default().fg(Color::DarkGray)
+                        };
+                        lines.push(Line::from(Span::styled(format!("  │ {}", l), line_style)));
                     }
-                    if output.lines().count() > 30 {
+                    if output_line_count > 30 {
                         lines.push(Line::from(Span::styled(
-                            "  | ...(truncated)",
-                            Style::default().fg(Color::DarkGray),
+                            format!(
+                                "  │ ... ({} more lines, press Enter to expand)",
+                                output_line_count - 30
+                            ),
+                            Style::default()
+                                .fg(Color::DarkGray)
+                                .add_modifier(Modifier::ITALIC),
                         )));
                     }
                     lines.push(Line::from(Span::styled(
@@ -376,10 +489,7 @@ fn render_conversation(f: &mut Frame, area: Rect, state: &AgentState, loading: b
                     .fg(border_color)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                "Allow: ",
-                Style::default().fg(Color::White),
-            ),
+            Span::styled("Allow: ", Style::default().fg(Color::White)),
             Span::styled(
                 format!("git {}", pending.command.join(" ")),
                 Style::default()
@@ -406,52 +516,59 @@ fn render_conversation(f: &mut Frame, area: Rect, state: &AgentState, loading: b
         lines.push(Line::from(Span::raw("")));
     }
 
-    // Thinking indicator
-    if loading && state.pending_command.is_none() {
+    // Thinking indicator — Claude Code style with animated dots
+    if loading && state.pending_command.is_none() && !state.command_executing {
+        let dots = match (SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            / 500) as usize
+            % 4
+        {
+            0 => "",
+            1 => ".",
+            2 => "..",
+            3 => "...",
+            _ => "",
+        };
         lines.push(Line::from(vec![
             Span::styled(
-                format!("  {} ", spinner_char()),
-                Style::default().fg(Color::Yellow),
+                "  ⏳ Thinking",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::DIM),
             ),
-            Span::styled("Thinking...", Style::default().fg(Color::Yellow)),
+            Span::styled(dots, Style::default().fg(Color::Yellow)),
         ]));
         lines.push(Line::from(Span::raw("")));
     }
 
     // Executing command indicator
     if let Some(ref label) = state.executing_label {
+        let dots = match (SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            / 500) as usize
+            % 4
+        {
+            0 => "",
+            1 => ".",
+            2 => "..",
+            3 => "...",
+            _ => "",
+        };
         lines.push(Line::from(vec![
             Span::styled(
-                format!("  {} ", spinner_char()),
-                Style::default().fg(Color::Cyan),
+                format!("  {} git {}", spinner_char(), label),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
             ),
-            Span::styled(
-                format!("Running: {}", label),
-                Style::default().fg(Color::Cyan),
-            ),
+            Span::styled(dots, Style::default().fg(Color::Cyan)),
         ]));
         lines.push(Line::from(Span::raw("")));
     }
 
-    // Auto-scroll: ensure the bottom is visible
-    let total_lines = lines.len() as u16;
-    let visible_height = area.height.saturating_sub(2); // account for borders
-    let auto_scroll = total_lines.saturating_sub(visible_height);
-    let effective_scroll = if state.scroll == 0 {
-        auto_scroll
-    } else {
-        state.scroll
-    };
-
-    let conversation = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::DarkGray)),
-        )
-        .scroll((effective_scroll, 0))
-        .wrap(Wrap { trim: false });
-    f.render_widget(conversation, area);
+    lines
 }
 
 fn render_input(f: &mut Frame, area: Rect, state: &AgentState) {
@@ -492,6 +609,8 @@ fn render_input(f: &mut Frame, area: Rect, state: &AgentState) {
         vec![
             Span::styled(" Enter ", Style::default().fg(Color::Cyan)),
             Span::raw("Send "),
+            Span::styled("↑/↓ ", Style::default().fg(Color::DarkGray)),
+            Span::raw("History "),
             Span::styled("Esc ", Style::default().fg(Color::DarkGray)),
             Span::raw("Exit input"),
         ]
@@ -499,8 +618,10 @@ fn render_input(f: &mut Frame, area: Rect, state: &AgentState) {
         vec![
             Span::styled(" i ", Style::default().fg(Color::Cyan)),
             Span::raw("Type "),
-            Span::styled("q/Esc ", Style::default().fg(Color::DarkGray)),
-            Span::raw("Back "),
+            Span::styled("j/k ", Style::default().fg(Color::DarkGray)),
+            Span::raw("Scroll "),
+            Span::styled("G ", Style::default().fg(Color::DarkGray)),
+            Span::raw("Bottom "),
             Span::styled("Ctrl+L ", Style::default().fg(Color::DarkGray)),
             Span::raw("Clear"),
         ]
@@ -640,12 +761,33 @@ fn handle_input_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<
     match key.code {
         KeyCode::Esc => {
             if app.agent_state.input.is_empty() {
-                // Exit agent mode
                 app.view = crate::app::View::Dashboard;
                 app.agent_state.input_active = false;
             } else {
-                // Deactivate input
                 app.agent_state.input_active = false;
+            }
+        }
+        KeyCode::Up => {
+            if app.agent_state.input.is_empty() && !app.agent_state.input_history.is_empty() {
+                if app.agent_state.history_index < app.agent_state.input_history.len() {
+                    let idx =
+                        app.agent_state.input_history.len() - 1 - app.agent_state.history_index;
+                    app.agent_state.input = app.agent_state.input_history[idx].clone();
+                    app.agent_state.history_index += 1;
+                }
+            }
+        }
+        KeyCode::Down => {
+            if app.agent_state.history_index > 0 {
+                app.agent_state.history_index -= 1;
+                let idx = app.agent_state.input_history.len() - app.agent_state.history_index;
+                if idx < app.agent_state.input_history.len() {
+                    app.agent_state.input = app.agent_state.input_history[idx].clone();
+                } else {
+                    app.agent_state.input.clear();
+                }
+            } else {
+                app.agent_state.input.clear();
             }
         }
         KeyCode::Enter => {
@@ -653,15 +795,20 @@ fn handle_input_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<
             if input.is_empty() {
                 return Ok(());
             }
-            // Add user message
+            if !app.agent_state.input_history.contains(&input) {
+                app.agent_state.input_history.push(input.clone());
+            }
+            app.agent_state.history_index = 0;
+
             app.agent_state.messages.push(AgentMessage {
                 role: MessageRole::User,
                 content: input.clone(),
             });
             app.agent_state.input.clear();
-            app.agent_state.scroll = 0; // auto-scroll to bottom
+            app.agent_state.scroll = 0;
+            app.agent_state.user_scrolled = false;
+            app.agent_state.dirty = true;
 
-            // Start AI request
             app.start_agent_chat();
         }
         KeyCode::Char(c) => {
@@ -678,30 +825,80 @@ fn handle_input_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<
 }
 
 fn handle_normal_key(app: &mut crate::app::App, key: KeyEvent) -> anyhow::Result<()> {
+    let state = &mut app.agent_state;
     match key.code {
         KeyCode::Char('i') => {
-            app.agent_state.input_active = true;
+            state.input_active = true;
         }
-        KeyCode::Char('q') | KeyCode::Esc => {
+        KeyCode::Char('q') => {
             app.view = crate::app::View::Dashboard;
         }
+        KeyCode::Esc => {
+            if state.user_scrolled {
+                state.scroll = 0;
+                state.user_scrolled = false;
+            } else {
+                app.view = crate::app::View::Dashboard;
+            }
+        }
         KeyCode::Up | KeyCode::Char('k') => {
-            app.agent_state.scroll = app.agent_state.scroll.saturating_add(3);
+            state.scroll = state.scroll.saturating_add(3);
+            state.user_scrolled = true;
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            if app.agent_state.scroll > 0 {
-                app.agent_state.scroll = app.agent_state.scroll.saturating_sub(3);
-            }
+            state.scroll = state.scroll.saturating_sub(3);
+            state.user_scrolled = true;
+        }
+        KeyCode::Char('g') => {
+            state.scroll = 0;
+            state.user_scrolled = false;
+        }
+        KeyCode::Char('G') => {
+            state.scroll = 0;
+            state.user_scrolled = false;
         }
         KeyCode::PageUp => {
-            app.agent_state.scroll = app.agent_state.scroll.saturating_add(10);
+            state.scroll = state.scroll.saturating_add(10);
+            state.user_scrolled = true;
         }
         KeyCode::PageDown => {
-            if app.agent_state.scroll > 0 {
-                app.agent_state.scroll = app.agent_state.scroll.saturating_sub(10);
-            }
+            state.scroll = state.scroll.saturating_sub(10);
+            state.user_scrolled = true;
+        }
+        KeyCode::Enter => {
+            toggle_tool_expand(state);
         }
         _ => {}
     }
     Ok(())
+}
+
+/// Toggle expand/collapse on the last ToolUse message.
+fn toggle_tool_expand(state: &mut AgentState) {
+    for msg in state.messages.iter_mut().rev() {
+        if let MessageRole::ToolUse { collapsed, .. } = &mut msg.role {
+            *collapsed = !*collapsed;
+            state.dirty = true;
+            break;
+        }
+    }
+}
+
+/// Handle mouse events for scrolling and tool toggle.
+pub fn handle_mouse(app: &mut crate::app::App, mouse: MouseEvent) {
+    let state = &mut app.agent_state;
+    match mouse.kind {
+        MouseEventKind::ScrollUp => {
+            state.scroll = state.scroll.saturating_add(3);
+            state.user_scrolled = true;
+        }
+        MouseEventKind::ScrollDown => {
+            state.scroll = state.scroll.saturating_sub(3);
+            state.user_scrolled = true;
+        }
+        MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+            toggle_tool_expand(state);
+        }
+        _ => {}
+    }
 }

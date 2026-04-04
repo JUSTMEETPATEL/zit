@@ -1364,7 +1364,7 @@ impl App {
     /// Start an async AI agent chat — non-blocking.
     pub fn start_agent_chat(&mut self) {
         if self.ai_loading {
-            self.set_status("AI is already processing...");
+            self.set_status("⏳ AI is already processing...");
             return;
         }
         let client = match self.ai_client {
@@ -1382,12 +1382,24 @@ impl App {
         // Build the user message from conversation history
         let user_message = self.build_agent_user_message();
 
+        // Spawn background thread for the AI request
         let (tx, rx) = mpsc::channel();
         self.ai_receiver = Some(rx);
 
         std::thread::spawn(move || {
-            let result = client.agent_chat(&user_message).map_err(|e| e.to_string());
-            let _ = tx.send(result);
+            let result = client.agent_chat(&user_message);
+            // agent_chat returns a Receiver; wait for the final result
+            match result.recv() {
+                Ok(Ok(text)) => {
+                    let _ = tx.send(Ok(text));
+                }
+                Ok(Err(e)) => {
+                    let _ = tx.send(Err(e));
+                }
+                Err(_) => {
+                    let _ = tx.send(Err("AI request channel disconnected".to_string()));
+                }
+            }
         });
     }
 
@@ -1415,6 +1427,7 @@ impl App {
                     command,
                     output,
                     success,
+                    ..
                 } => {
                     let status = if *success { "OK" } else { "FAILED" };
                     parts.push(format!(
@@ -1441,31 +1454,59 @@ impl App {
         parts.join("\n\n")
     }
 
-    /// Execute a git command from the agent's tool-use request.
+    /// Execute a git command from the agent's tool-use request (async, non-blocking).
     pub fn execute_agent_command(&mut self, args: Vec<String>) {
         let cmd_str = args.join(" ");
         self.agent_state.executing_label = Some(format!("git {}", cmd_str));
+        self.agent_state.command_executing = true;
 
-        let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let (output, success) = match git::run_git(&args_str) {
-            Ok(out) => (out, true),
-            Err(e) => (e.to_string(), false),
-        };
+        let args_str: Vec<String> = args.clone();
+        let (tx, rx) = mpsc::channel();
+        self.agent_state.command_receiver = Some(rx);
 
-        self.agent_state.executing_label = None;
-
-        // Add tool-use result to conversation
-        self.agent_state.messages.push(agent::AgentMessage {
-            role: agent::MessageRole::ToolUse {
-                command: cmd_str,
-                output: output.clone(),
-                success,
-            },
-            content: String::new(),
+        std::thread::spawn(move || {
+            let args_refs: Vec<&str> = args_str.iter().map(|s| s.as_str()).collect();
+            let (output, success) = match git::run_git(&args_refs) {
+                Ok(out) => (out, true),
+                Err(e) => (e.to_string(), false),
+            };
+            let _ = tx.send((cmd_str, output, success));
         });
+    }
 
-        // Process next pending tool use or continue the agent loop
-        self.process_agent_next_tool();
+    /// Poll for async git command execution result.
+    pub fn poll_agent_command(&mut self) {
+        if !self.agent_state.command_executing {
+            return;
+        }
+        if let Some(ref rx) = self.agent_state.command_receiver {
+            match rx.try_recv() {
+                Ok((cmd_str, output, success)) => {
+                    self.agent_state.command_executing = false;
+                    self.agent_state.command_receiver = None;
+                    self.agent_state.executing_label = None;
+
+                    self.agent_state.messages.push(agent::AgentMessage {
+                        role: agent::MessageRole::ToolUse {
+                            command: cmd_str,
+                            output,
+                            success,
+                            collapsed: false,
+                        },
+                        content: String::new(),
+                    });
+                    self.agent_state.dirty = true;
+
+                    self.process_agent_next_tool();
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    self.agent_state.command_executing = false;
+                    self.agent_state.command_receiver = None;
+                    self.agent_state.executing_label = None;
+                }
+                Err(mpsc::TryRecvError::Empty) => {}
+            }
+        }
     }
 
     /// Process the next tool-use in the queue, or re-send to AI if queue is empty.
@@ -1509,36 +1550,57 @@ impl App {
             .unwrap_or(false);
 
         if should_continue {
+            // CRITICAL: Reset loading state before re-calling, otherwise
+            // start_agent_chat() will bail out with "AI is already processing"
+            self.ai_loading = false;
+            self.ai_action = None;
+            self.ai_receiver = None;
+            self.agent_state.thinking = true;
             self.start_agent_chat();
+        } else {
+            // Agent loop is done — reset all state
+            self.ai_loading = false;
+            self.ai_action = None;
+            self.ai_receiver = None;
+            self.agent_state.thinking = false;
+            self.agent_state.dirty = true;
+            self.set_status("✓ Agent task complete");
         }
     }
 
     /// Parse [TOOL_USE] blocks from an AI agent response.
-    /// Returns the text parts and tool-use requests separately.
-    fn parse_agent_response(response: &str) -> (String, Vec<(String, Vec<String>)>) {
-        let mut text_parts = Vec::new();
+    /// Returns (text_before_tools, tool_uses, text_after_tools).
+    fn parse_agent_response(response: &str) -> (String, Vec<(String, Vec<String>)>, String) {
+        let mut text_before = Vec::new();
+        let mut text_after = Vec::new();
         let mut tool_uses = Vec::new();
+        let mut found_first_tool = false;
 
         for line in response.lines() {
             let trimmed = line.trim();
             if let Some(cmd) = trimmed.strip_prefix("[TOOL_USE]") {
                 let cmd = cmd.trim();
-                // Parse "git <args>"
                 if let Some(git_args) = cmd.strip_prefix("git ") {
                     let args: Vec<String> =
                         git_args.split_whitespace().map(|s| s.to_string()).collect();
                     if !args.is_empty() {
-                        // Use the preceding text as the description
-                        let desc = text_parts.last().cloned().unwrap_or_default();
+                        let desc = if found_first_tool {
+                            text_after.last().cloned().unwrap_or_default()
+                        } else {
+                            text_before.last().cloned().unwrap_or_default()
+                        };
                         tool_uses.push((desc, args));
+                        found_first_tool = true;
                     }
                 }
+            } else if found_first_tool {
+                text_after.push(line.to_string());
             } else {
-                text_parts.push(line.to_string());
+                text_before.push(line.to_string());
             }
         }
 
-        (text_parts.join("\n"), tool_uses)
+        (text_before.join("\n"), tool_uses, text_after.join("\n"))
     }
 
     /// Execute a follow-up action from the suggestion list.
@@ -1928,21 +1990,28 @@ impl App {
                         Some(AiAction::AgentChat) => {
                             self.agent_state.thinking = false;
 
-                            // Parse the response for text + tool-use blocks
-                            let (text, tool_uses) = Self::parse_agent_response(&response);
+                            // Parse the response: text before tools, tool uses, text after tools
+                            let (text_before, tool_uses, text_after) =
+                                Self::parse_agent_response(&response);
 
                             if tool_uses.is_empty() {
                                 // No tool uses — just render agent text
-                                let trimmed = text.trim().to_string();
+                                let trimmed = text_before.trim().to_string();
                                 if !trimmed.is_empty() {
                                     self.agent_state.messages.push(agent::AgentMessage {
                                         role: agent::MessageRole::Agent,
                                         content: trimmed,
                                     });
                                 }
+                                // Agent loop is done — reset state
+                                self.ai_loading = false;
+                                self.ai_action = None;
+                                self.ai_receiver = None;
+                                self.agent_state.dirty = true;
+                                self.set_status("✓ Agent task complete");
                             } else {
-                                // Store agent text before tool uses
-                                let trimmed = text.trim().to_string();
+                                // Show text before tool uses
+                                let trimmed = text_before.trim().to_string();
                                 if !trimmed.is_empty() {
                                     self.agent_state.messages.push(agent::AgentMessage {
                                         role: agent::MessageRole::Agent,
@@ -1950,10 +2019,14 @@ impl App {
                                     });
                                 }
 
-                                // Queue all tool uses
-                                self.agent_state.pending_tool_uses = tool_uses;
+                                // Store text after tool uses for later (shown after tool results)
+                                if !text_after.trim().is_empty() {
+                                    self.agent_state.pending_agent_text =
+                                        Some(text_after.trim().to_string());
+                                }
 
-                                // Process the first one
+                                // Queue all tool uses and process them
+                                self.agent_state.pending_tool_uses = tool_uses;
                                 self.process_agent_next_tool();
                             }
                         }
@@ -2048,6 +2121,9 @@ impl App {
                             .select(Some(self.stash_state.selected));
                     }
                 }
+                View::Agent => {
+                    agent::handle_mouse(self, mouse);
+                }
                 _ => {}
             },
             MouseEventKind::ScrollUp => match self.view {
@@ -2081,6 +2157,9 @@ impl App {
                             .list_state
                             .select(Some(self.stash_state.selected));
                     }
+                }
+                View::Agent => {
+                    agent::handle_mouse(self, mouse);
                 }
                 _ => {}
             },

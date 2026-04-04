@@ -6,7 +6,8 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::io::Read;
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::config::AiConfig;
@@ -337,6 +338,81 @@ impl AiClient {
         anyhow::bail!("{}", classify_http_error(status));
     }
 
+    /// Call Bedrock with streaming response for agent mode.
+    /// Reads the response body incrementally to show tokens as they arrive.
+    #[allow(dead_code)]
+    fn call_bedrock_with_streaming(&self, request: &MentorRequest) -> Result<String> {
+        let body = serde_json::to_value(request).context("Failed to serialize request")?;
+
+        let mut last_error = None;
+
+        for attempt in 0..=MAX_RETRIES {
+            if attempt > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(
+                    500 * 2u64.pow(attempt - 1),
+                ));
+            }
+
+            let send_result = self
+                .client
+                .post(&self.endpoint)
+                .header("Content-Type", "application/json")
+                .header("x-api-key", &self.api_key)
+                .header("x-request-id", Self::request_id())
+                .json(&body)
+                .send();
+
+            match send_result {
+                Ok(resp) => {
+                    let status = resp.status();
+
+                    if status.is_client_error() {
+                        return self.parse_error_response(resp, status.as_u16());
+                    }
+
+                    if status.is_server_error() {
+                        last_error = Some(anyhow::anyhow!(classify_http_error(status.as_u16())));
+                        continue;
+                    }
+
+                    // Read the full response body as text
+                    let text = resp.text().context("Failed to read response body")?;
+
+                    // Try to parse as JSON API response
+                    if let Ok(api_resp) = serde_json::from_str::<MentorApiResponse>(&text) {
+                        if !api_resp.success {
+                            let err_msg = api_resp
+                                .error
+                                .unwrap_or_else(|| "Unknown API error".to_string());
+                            anyhow::bail!("{}", err_msg);
+                        }
+                        if let Some(content) = api_resp.response.and_then(|r| r.content) {
+                            return Ok(content);
+                        }
+                    }
+
+                    // Fallback: return raw text
+                    if !text.is_empty() {
+                        return Ok(text);
+                    }
+
+                    anyhow::bail!("Empty response from AI service");
+                }
+                Err(e) => {
+                    if attempt == 0 && e.is_connect() {
+                        return Err(anyhow::anyhow!(
+                            "You appear to be offline — cannot reach AI service."
+                        ));
+                    }
+                    last_error = Some(classify_request_error(e));
+                    continue;
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("AI request failed after retries")))
+    }
+
     /// Direct provider path: build prompts client-side, call provider.chat().
     fn call_direct(&self, request: &MentorRequest) -> Result<String> {
         let ctx = request
@@ -634,22 +710,119 @@ impl AiClient {
     }
 
     /// Agent mode: send a user message with full conversation context.
-    /// The `user_message` should contain the formatted conversation history
-    /// and the latest user intent.
-    pub fn agent_chat(&self, user_message: &str) -> Result<String> {
-        let ctx = build_repo_context(false)?;
+    /// Returns a receiver that yields the final Result<String, String>.
+    pub fn agent_chat(&self, user_message: &str) -> mpsc::Receiver<Result<String, String>> {
+        let ctx = match build_repo_context(false) {
+            Ok(c) => c,
+            Err(e) => {
+                let (tx, rx) = mpsc::channel();
+                let _ = tx.send(Err(e.to_string()));
+                return rx;
+            }
+        };
         let request = MentorRequest {
             request_type: "agent".to_string(),
             context: Some(ctx),
             query: Some(user_message.to_string()),
             error: None,
         };
-        // Don't use the cached call — agent responses should never be cached
-        if self.provider_kind == "bedrock" {
-            self.call_bedrock(&request)
-        } else {
-            self.call_direct(&request)
-        }
+
+        let endpoint = self.endpoint.clone();
+        let api_key = self.api_key.clone();
+        let body = match serde_json::to_value(&request) {
+            Ok(b) => b,
+            Err(e) => {
+                let (tx, rx) = mpsc::channel();
+                let _ = tx.send(Err(format!("Failed to serialize request: {}", e)));
+                return rx;
+            }
+        };
+
+        let (tx, rx) = mpsc::channel();
+
+        std::thread::spawn(move || {
+            let client = match reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(300))
+                .build()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("Failed to create HTTP client: {}", e)));
+                    return;
+                }
+            };
+
+            let resp = match client
+                .post(&endpoint)
+                .header("Content-Type", "application/json")
+                .header("x-api-key", &api_key)
+                .header("x-request-id", Self::request_id())
+                .json(&body)
+                .send()
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("Failed to send request: {}", e)));
+                    return;
+                }
+            };
+
+            let status = resp.status();
+            if status.is_client_error() || status.is_server_error() {
+                let text = resp.text().unwrap_or_default();
+                let _ = tx.send(Err(format!(
+                    "AI service error ({}): {}",
+                    status.as_u16(),
+                    text
+                )));
+                return;
+            }
+
+            // Read response body incrementally
+            let mut full_text = String::new();
+            let mut reader = resp;
+            let mut buf = [0u8; 1024];
+
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let chunk = String::from_utf8_lossy(&buf[..n]);
+                        full_text.push_str(&chunk);
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("Stream error: {}", e)));
+                        return;
+                    }
+                }
+            }
+
+            // Parse as JSON API response and extract content
+            if let Ok(api_resp) = serde_json::from_str::<MentorApiResponse>(&full_text) {
+                if !api_resp.success {
+                    let err_msg = api_resp
+                        .error
+                        .unwrap_or_else(|| "Unknown API error".to_string());
+                    let _ = tx.send(Err(err_msg));
+                    return;
+                }
+                if let Some(content) = api_resp.response.and_then(|r| r.content) {
+                    let _ = tx.send(Ok(content));
+                    return;
+                }
+            }
+
+            // Fallback: return raw text
+            if !full_text.is_empty() {
+                let _ = tx.send(Ok(full_text));
+                return;
+            }
+
+            let _ = tx.send(Err("Empty response from AI service".to_string()));
+        });
+
+        rx
     }
 }
 

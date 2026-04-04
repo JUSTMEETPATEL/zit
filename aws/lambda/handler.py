@@ -35,6 +35,7 @@ VALID_REQUEST_TYPES = [
     "review",
     "merge_resolve",
     "merge_strategy",
+    "agent",
 ]
 
 
@@ -137,7 +138,9 @@ def lambda_handler(event, context):
         error_message = body.get("error", "")
 
         # Build the prompt based on request type
-        if request_type == "explain":
+        if request_type == "agent":
+            response = handle_agent(repo_context, user_query)
+        elif request_type == "explain":
             response = handle_explain(repo_context, user_query)
         elif request_type == "error":
             response = handle_error(error_message, repo_context)
@@ -172,13 +175,25 @@ def lambda_handler(event, context):
 
 def invoke_bedrock(system_prompt: str, user_message: str) -> str:
     """Invoke Amazon Bedrock with Claude model."""
+    return invoke_bedrock_with_tokens(system_prompt, user_message, 1024)
+
+
+def invoke_bedrock_stream(system_prompt: str, user_message: str) -> str:
+    """Invoke Amazon Bedrock with streaming for faster first token."""
+    return invoke_bedrock_stream_with_tokens(system_prompt, user_message, 4096)
+
+
+def invoke_bedrock_with_tokens(
+    system_prompt: str, user_message: str, max_tokens: int
+) -> str:
+    """Invoke Amazon Bedrock with Claude model (configurable max tokens)."""
     logger.info(f"Invoking Bedrock model: {MODEL_ID}")
 
     client = get_bedrock_client()
 
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
+        "max_tokens": max_tokens,
         "temperature": 0.7,
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_message}],
@@ -193,7 +208,6 @@ def invoke_bedrock(system_prompt: str, user_message: str) -> str:
 
     response_body = json.loads(response["body"].read())
 
-    # Log token usage for cost tracking
     usage = response_body.get("usage", {})
     logger.info(
         f"Token usage - Input: {usage.get('input_tokens', 0)}, Output: {usage.get('output_tokens', 0)}"
@@ -202,15 +216,17 @@ def invoke_bedrock(system_prompt: str, user_message: str) -> str:
     return response_body["content"][0]["text"]
 
 
-def invoke_bedrock_stream(system_prompt: str, user_message: str) -> str:
-    """Invoke Amazon Bedrock with streaming for faster first token."""
+def invoke_bedrock_stream_with_tokens(
+    system_prompt: str, user_message: str, max_tokens: int
+) -> str:
+    """Invoke Amazon Bedrock with streaming (configurable max tokens)."""
     logger.info(f"Invoking Bedrock model (streaming): {MODEL_ID}")
 
     client = get_bedrock_client()
 
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
+        "max_tokens": max_tokens,
         "temperature": 0.7,
         "system": system_prompt,
         "messages": [{"role": "user", "content": user_message}],
@@ -315,6 +331,27 @@ No explanation, no markdown, no code blocks. Only the 3 lines.
     suggestion = invoke_bedrock(system_prompt, user_message)
 
     return {"type": "commit_suggestion", "content": suggestion}
+
+
+def handle_agent(repo_context: dict, user_query: str) -> dict:
+    """Handle agent mode requests — AI acts as an autonomous git agent."""
+    system_prompt = get_system_prompt("agent")
+    context_str = format_context(repo_context)
+
+    user_message = f"""
+Repository Context:
+{context_str}
+
+Conversation History:
+{user_query}
+
+Analyze the user's request and the current repository state. If you need to run git commands,
+use the [TOOL_USE] git <args> format. After each tool result, decide what to do next.
+"""
+
+    suggestion = invoke_bedrock_stream(system_prompt, user_message)
+
+    return {"type": "agent", "content": suggestion}
 
 
 def handle_learn(repo_context: dict, topic: str) -> dict:

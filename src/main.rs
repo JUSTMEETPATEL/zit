@@ -189,10 +189,12 @@ fn run_app(
         match events.next()? {
             AppEvent::Key(key) => {
                 app.poll_ai_result();
+                app.poll_agent_command();
                 app.handle_key(key)?;
             }
             AppEvent::Tick => {
                 app.poll_ai_result();
+                app.poll_agent_command();
                 // Auto-refresh on tick for the current view
                 app.refresh();
                 // Poll GitHub Device Flow if active
@@ -204,6 +206,7 @@ fn run_app(
             }
             AppEvent::Mouse(mouse) => {
                 app.poll_ai_result();
+                app.poll_agent_command();
                 app.handle_mouse(mouse);
             }
             AppEvent::Resize(_, _) => {
@@ -294,7 +297,7 @@ fn draw(f: &mut Frame, app: &mut App) {
             ui::agent::render(
                 f,
                 area,
-                &app.agent_state,
+                &mut app.agent_state,
                 ai_available,
                 loading,
                 &provider_label,
@@ -400,9 +403,7 @@ fn draw(f: &mut Frame, app: &mut App) {
                 Line::from(""),
                 Line::from(Span::styled(
                     "  🛡 Potential secrets detected!",
-                    Style::default()
-                        .fg(Color::Red)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                 )),
                 Line::from(Span::styled(
                     "  The following sensitive data was found:",
@@ -452,9 +453,7 @@ fn draw(f: &mut Frame, app: &mut App) {
                     Block::default()
                         .title(Span::styled(
                             " 🛡 Secret Scanner ",
-                            Style::default()
-                                .fg(Color::Red)
-                                .add_modifier(Modifier::BOLD),
+                            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                         ))
                         .borders(Borders::ALL)
                         .border_style(Style::default().fg(Color::Red)),

@@ -33,12 +33,18 @@ pub fn default_rules() -> Vec<SecretRule> {
     // Each tuple is (name, regex_pattern). Patterns are compiled once per call.
     let raw: Vec<(&str, &str)> = vec![
         // ── Cloud Provider Keys ────────────────────────────────────
-        ("AWS Access Key ID", r"(?:^|[^A-Za-z0-9/+=])(?:AKIA[0-9A-Z]{16})(?:$|[^A-Za-z0-9/+=])"),
+        (
+            "AWS Access Key ID",
+            r"(?:^|[^A-Za-z0-9/+=])(?:AKIA[0-9A-Z]{16})(?:$|[^A-Za-z0-9/+=])",
+        ),
         (
             "AWS Secret Access Key",
             r#"(?i)(?:aws_secret_access_key|aws_secret)\s*[:=]\s*['"]?([A-Za-z0-9/+=]{40})['"]?"#,
         ),
-        ("Google API Key", r"(?:^|[^A-Za-z0-9])AIza[0-9A-Za-z\-_]{35}(?:$|[^A-Za-z0-9])"),
+        (
+            "Google API Key",
+            r"(?:^|[^A-Za-z0-9])AIza[0-9A-Za-z\-_]{35}(?:$|[^A-Za-z0-9])",
+        ),
         // ── Git Platform Tokens ────────────────────────────────────
         (
             "GitHub Personal Access Token",
@@ -238,7 +244,11 @@ pub fn scan_staged_files(
 /// Scan only the **added** lines from a unified diff string.
 /// This avoids flagging pre-existing secrets that haven't changed.
 #[allow(dead_code)]
-pub fn scan_diff_content(diff: &str, rules: &[SecretRule], allowlist: &[String]) -> Vec<SecretFinding> {
+pub fn scan_diff_content(
+    diff: &str,
+    rules: &[SecretRule],
+    allowlist: &[String],
+) -> Vec<SecretFinding> {
     let mut findings = Vec::new();
     let mut current_file = String::new();
     let mut line_in_new: usize = 0;
@@ -340,7 +350,9 @@ mod tests {
         let content = "export TOKEN=gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij";
         let findings = scan_content(".env", content, &rules());
         assert!(
-            findings.iter().any(|f| f.rule_name.contains("GitHub OAuth")),
+            findings
+                .iter()
+                .any(|f| f.rule_name.contains("GitHub OAuth")),
             "Should detect GitHub OAuth token, got: {:?}",
             findings
         );
@@ -353,9 +365,7 @@ mod tests {
         let content = "GITLAB_TOKEN=glpat-abcdefghijklmnopqrst";
         let findings = scan_content(".env", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("GitLab")),
+            findings.iter().any(|f| f.rule_name.contains("GitLab")),
             "Should detect GitLab PAT, got: {:?}",
             findings
         );
@@ -444,9 +454,7 @@ mod tests {
         let content = r#"DATABASE_URL="postgres://admin:s3cr3tP4ss@db.example.com:5432/mydb""#;
         let findings = scan_content(".env", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("Database")),
+            findings.iter().any(|f| f.rule_name.contains("Database")),
             "Should detect postgres connection string, got: {:?}",
             findings
         );
@@ -457,9 +465,7 @@ mod tests {
         let content = r#"MONGO_URI=mongodb://root:password123@mongo.example.com:27017/app"#;
         let findings = scan_content(".env", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("Database")),
+            findings.iter().any(|f| f.rule_name.contains("Database")),
             "Should detect MongoDB connection string, got: {:?}",
             findings
         );
@@ -472,9 +478,7 @@ mod tests {
         let content = r#"api_key = "sk-abcdef1234567890abcdef""#;
         let findings = scan_content("config.py", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("API Key")),
+            findings.iter().any(|f| f.rule_name.contains("API Key")),
             "Should detect generic API key, got: {:?}",
             findings
         );
@@ -485,9 +489,7 @@ mod tests {
         let content = r#"password = "MyS3cureP@ssw0rd!""#;
         let findings = scan_content("settings.py", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("Password")),
+            findings.iter().any(|f| f.rule_name.contains("Password")),
             "Should detect generic password, got: {:?}",
             findings
         );
@@ -498,9 +500,7 @@ mod tests {
         let content = r#"secret_key = "abcdef1234567890abcdef""#;
         let findings = scan_content("app.py", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("Secret")),
+            findings.iter().any(|f| f.rule_name.contains("Secret")),
             "Should detect generic secret assignment, got: {:?}",
             findings
         );
@@ -511,9 +511,7 @@ mod tests {
         let content = r#"auth_token = "abcdef1234567890abcdef""#;
         let findings = scan_content("app.py", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("Token")),
+            findings.iter().any(|f| f.rule_name.contains("Token")),
             "Should detect generic token assignment, got: {:?}",
             findings
         );
@@ -523,13 +521,14 @@ mod tests {
 
     #[test]
     fn test_detect_sendgrid_key() {
-        let content =
-            format!("SENDGRID_KEY=SG.{}.{}", "abcdefghijklmnopqrstuv", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq").as_str();
+        let content = format!(
+            "SENDGRID_KEY=SG.{}.{}",
+            "abcdefghijklmnopqrstuv", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq"
+        )
+        .as_str();
         let findings = scan_content(".env", content, &rules());
         assert!(
-            findings
-                .iter()
-                .any(|f| f.rule_name.contains("SendGrid")),
+            findings.iter().any(|f| f.rule_name.contains("SendGrid")),
             "Should detect SendGrid API key, got: {:?}",
             findings
         );
@@ -764,8 +763,7 @@ password = "MyS3cureP@ssw0rd!"
 
     #[test]
     fn test_line_numbers_correct() {
-        let content = "line1\nline2\nSTRIPE_KEY=sk_live_"
-        + "abcdefghijklmnopqrstuvwx\nline4";
+        let content = "line1\nline2\nSTRIPE_KEY=sk_live_" + "abcdefghijklmnopqrstuvwx\nline4";
         let findings = scan_content("test.env", content, &rules());
         assert!(
             findings.iter().any(|f| f.line == 3),
