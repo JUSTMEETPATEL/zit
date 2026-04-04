@@ -98,10 +98,7 @@ impl DashboardState {
             Err(_) => self.recent_commits = Vec::new(),
         }
 
-        match git::log::get_log(1, 0, None) {
-            Ok(commits) => self.commit_count = commits.len(),
-            Err(_) => self.commit_count = 0,
-        }
+        self.commit_count = git::log::commit_count().unwrap_or(0);
 
         self.display_staged = self.staged_count;
         self.display_unstaged = self.unstaged_count;
@@ -463,55 +460,114 @@ pub fn render(
         }
     }
 
-   let key_spans = vec![
-    // --- Navigation / View (Steel Blue)
-    Span::styled(" s ", Style::default().fg(Color::Black).bg(Color::Rgb(82, 175, 209))),
-    Span::raw(" Stage  "),
-    Span::styled(" c ", Style::default().fg(Color::Black).bg(Color::Rgb(82, 175, 209))),
-    Span::raw(" Commit  "),
-    Span::styled(" l ", Style::default().fg(Color::Black).bg(Color::Rgb(82, 175, 209))),
-    Span::raw(" Log  "),
-    Span::styled(" b ", Style::default().fg(Color::Black).bg(Color::Rgb(82, 175, 209))),
-    Span::raw(" Branches  "),
+    let key_spans = Line::from(vec![
+        Span::styled(
+            "[s]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(82, 175, 209)),
+        ),
+        Span::raw("Stage "),
+        Span::styled(
+            "[c]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(82, 175, 209)),
+        ),
+        Span::raw("Commit "),
+        Span::styled(
+            "[b]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(82, 175, 209)),
+        ),
+        Span::raw("Branches "),
+        Span::styled(
+            "[l]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(82, 175, 209)),
+        ),
+        Span::raw("Log "),
+        Span::styled(
+            "[t]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(155, 114, 215)),
+        ),
+        Span::raw("TimeTravel "),
+        Span::styled(
+            "[r]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(155, 114, 215)),
+        ),
+        Span::raw("Reflog "),
+        Span::styled(
+            "[g]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(50, 190, 140)),
+        ),
+        Span::raw("GitHub "),
+        Span::styled(
+            "[a]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(220, 80, 200)),
+        ),
+        Span::raw("AI "),
+        Span::styled(
+            "[m]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(220, 160, 50)),
+        ),
+        Span::raw("Merge "),
+        Span::styled(
+            "[p]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(220, 160, 50)),
+        ),
+        Span::raw("CherryPick "),
+        Span::styled(
+            "[w]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(50, 190, 140)),
+        ),
+        Span::raw("Workflow "),
+        Span::styled(
+            "[B]",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(155, 114, 215)),
+        ),
+        Span::raw("Bisect "),
+        Span::styled(
+            "[?]",
+            Style::default()
+                .fg(Color::White)
+                .bg(Color::Rgb(80, 85, 100)),
+        ),
+        Span::raw("Help "),
+        Span::styled(
+            "[q]",
+            Style::default()
+                .fg(Color::White)
+                .bg(Color::Rgb(190, 50, 60)),
+        ),
+        Span::raw("Quit"),
+    ]);
 
-    // --- Git Operations (Soft Purple)
-    Span::styled(" r ", Style::default().fg(Color::Black).bg(Color::Rgb(155, 114, 215))),
-    Span::raw(" Reflog  "),
-    Span::styled(" t ", Style::default().fg(Color::Black).bg(Color::Rgb(155, 114, 215))),
-    Span::raw(" Time Travel  "),
-    Span::styled(" B ", Style::default().fg(Color::Black).bg(Color::Rgb(155, 114, 215))),
-    Span::raw(" Bisect  "),
-
-    // --- Merge / Conflict (Amber)
-    Span::styled(" m ", Style::default().fg(Color::Black).bg(Color::Rgb(220, 160, 50))),
-    Span::raw(" Merge  "),
-    Span::styled(" p ", Style::default().fg(Color::Black).bg(Color::Rgb(220, 160, 50))),
-    Span::raw(" Cherry Pick  "),
-
-    // --- Remote / External (Teal Green)
-    Span::styled(" g ", Style::default().fg(Color::Black).bg(Color::Rgb(50, 190, 140))),
-    Span::raw(" GitHub  "),
-    Span::styled(" w ", Style::default().fg(Color::Black).bg(Color::Rgb(50, 190, 140))),
-    Span::raw(" Workflow  "),
-
-    // --- AI (Hot Magenta — distinct, premium feel)
-    Span::styled(" a ", Style::default().fg(Color::Black).bg(Color::Rgb(220, 80, 200))),
-    Span::raw(" AI  "),
-
-    // --- Meta / System (Cool Gray)
-    Span::styled(" ? ", Style::default().fg(Color::White).bg(Color::Rgb(80, 85, 100))),
-    Span::raw(" Help  "),
-
-    // --- Destructive (Deep Red)
-    Span::styled(" q ", Style::default().fg(Color::White).bg(Color::Rgb(190, 50, 60))),
-    Span::raw(" Quit"),
-];
-
-    let keys = Paragraph::new(Line::from(key_spans)).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray)),
-    );
+    let keys = Paragraph::new(key_spans)
+        .wrap(ratatui::widgets::Wrap { trim: true })
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::DarkGray)),
+        );
     f.render_widget(keys, main_chunks[2]);
 
     if let Some(msg) = status_msg {
